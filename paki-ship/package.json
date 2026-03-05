@@ -1,5 +1,5 @@
 {
-  "name": "system-1-web",
+  "name": "paki-ship",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -7,7 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
-    "test": "jest --coverage"
+    "test": "jest --coverage",
+    "test:coverage": "jest --coverage",
+    "test:watch": "jest --watch",
+    "test:e2e": "tsx tests/e2e/selenium-e2e.ts",
+    "test:e2e:firefox": "tsx tests/e2e/selenium-e2e.ts --browser=firefox",
+    "test:k6": "k6 run ../tests/performance/k6-smoke.ts"
   },
   "dependencies": {
     "next": "^15.0.0",
@@ -30,6 +35,8 @@
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "jsdom": "^28.1.0",
+    "selenium-webdriver": "^4.41.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.3"
   }
 }
