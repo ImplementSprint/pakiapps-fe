@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
-import App from '../src/App';
-import Page from '../src/app/page';
-import RootLayout, { metadata } from '../src/app/layout';
+import App from '../../src/App';
+import Page from '../../src/app/page';
+import RootLayout, { metadata } from '../../src/app/layout';
 
 describe('System-2-Web', () => {
   it('renders application title', () => {
