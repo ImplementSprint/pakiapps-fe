@@ -1,6 +1,6 @@
 declare module 'selenium-webdriver';
-declare module 'selenium-webdriver/chrome';
-declare module 'selenium-webdriver/firefox';
+declare module 'selenium-webdriver/chrome.js';
+declare module 'selenium-webdriver/firefox.js';
 
 declare const process: {
 	argv: string[];

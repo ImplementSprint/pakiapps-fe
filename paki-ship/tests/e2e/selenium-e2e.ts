@@ -1,6 +1,6 @@
 import { Builder, Browser, By, until } from 'selenium-webdriver';
-import chrome from 'selenium-webdriver/chrome';
-import firefox from 'selenium-webdriver/firefox';
+import chrome from 'selenium-webdriver/chrome.js';
+import firefox from 'selenium-webdriver/firefox.js';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
 
@@ -134,16 +134,20 @@ async function runSmoke() {
   }
 }
 
-const appProcess = await ensureLocalAppServer();
+async function main() {
+  const appProcess = await ensureLocalAppServer();
 
-try {
-  await runSmoke();
-} catch (error) {
-  console.error('❌ Selenium smoke failed');
-  console.error(error);
-  process.exit(1);
-} finally {
-  if (appProcess) {
-    appProcess.kill();
+  try {
+    await runSmoke();
+  } catch (error) {
+    console.error('❌ Selenium smoke failed');
+    console.error(error);
+    process.exit(1);
+  } finally {
+    if (appProcess) {
+      appProcess.kill();
+    }
   }
 }
+
+main();
