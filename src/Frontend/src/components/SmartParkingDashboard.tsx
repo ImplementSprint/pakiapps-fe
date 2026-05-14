@@ -57,29 +57,29 @@ const GRACE_PERIOD_MIN = 30; // must match backend
 type SlotCategory = 'regular' | 'pwd' | 'electric' | 'vip' | 'motorcycle' | 'compact';
 
 const typeToCategory: Record<string, SlotCategory> = {
-  regular:    'regular',
-  handicapped:'pwd',
-  ev_charging:'electric',
-  vip:        'vip',
+  regular: 'regular',
+  handicapped: 'pwd',
+  ev_charging: 'electric',
+  vip: 'vip',
   motorcycle: 'motorcycle',
 };
 
 const categoryStyles: Record<SlotCategory, { bg: string; border: string; text: string; icon: string }> = {
-  regular:    { bg: 'bg-gray-500',   border: 'border-gray-300',   text: 'text-gray-600',   icon: 'text-gray-400' },
-  pwd:        { bg: 'bg-blue-500',   border: 'border-blue-300',   text: 'text-blue-700',   icon: 'text-blue-400' },
-  electric:   { bg: 'bg-emerald-500',border: 'border-emerald-300',text: 'text-emerald-700',icon: 'text-emerald-400'},
-  vip:        { bg: 'bg-purple-500', border: 'border-purple-300', text: 'text-purple-700', icon: 'text-purple-400'},
-  motorcycle: { bg: 'bg-orange-500', border: 'border-orange-300', text: 'text-orange-700', icon: 'text-orange-400'},
-  compact:    { bg: 'bg-teal-500',   border: 'border-teal-300',   text: 'text-teal-700',   icon: 'text-teal-400' },
+  regular: { bg: 'bg-gray-500', border: 'border-gray-300', text: 'text-gray-600', icon: 'text-gray-400' },
+  pwd: { bg: 'bg-blue-500', border: 'border-blue-300', text: 'text-blue-700', icon: 'text-blue-400' },
+  electric: { bg: 'bg-emerald-500', border: 'border-emerald-300', text: 'text-emerald-700', icon: 'text-emerald-400' },
+  vip: { bg: 'bg-purple-500', border: 'border-purple-300', text: 'text-purple-700', icon: 'text-purple-400' },
+  motorcycle: { bg: 'bg-orange-500', border: 'border-orange-300', text: 'text-orange-700', icon: 'text-orange-400' },
+  compact: { bg: 'bg-teal-500', border: 'border-teal-300', text: 'text-teal-700', icon: 'text-teal-400' },
 };
 
 const categoryIcons: Record<SlotCategory, React.ComponentType<any>> = {
-  regular:    Grid3x3,
-  pwd:        Accessibility,
-  electric:   Zap,
-  vip:        Crown,
+  regular: Grid3x3,
+  pwd: Accessibility,
+  electric: Zap,
+  vip: Crown,
   motorcycle: Shield,
-  compact:    Grid3x3,
+  compact: Grid3x3,
 };
 
 // ─── Timing helpers (mirrors server-side logic for client-computed states) ──
@@ -96,7 +96,7 @@ function parseTimeSlot(ts: string): { startMin: number; endMin: number } {
 
 function minToHHMM(min: number): string {
   const h = Math.floor(min / 60), m = min % 60;
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 function getTimingState(status: string, isOverstay: boolean, isNoShow: boolean, isInGracePeriod: boolean, isArrivingSoon: boolean): BookingTiming['timingState'] {
@@ -118,23 +118,23 @@ function recomputeTiming(slot: DashboardSlot, today: string): BookingTiming | nu
   const now = nowMinutes();
   const isToday = slot.booking.date === today || !!t?.isToday;
   const minutesUntilStart = startMin - now;
-  const minutesPastEnd    = now - endMin;
-  const graceExpiry       = startMin + GRACE_PERIOD_MIN;
+  const minutesPastEnd = now - endMin;
+  const graceExpiry = startMin + GRACE_PERIOD_MIN;
 
-  const isArrivingSoon  = isToday && status === 'upcoming' && minutesUntilStart > 0 && minutesUntilStart <= 60;
+  const isArrivingSoon = isToday && status === 'upcoming' && minutesUntilStart > 0 && minutesUntilStart <= 60;
   const isInGracePeriod = isToday && status === 'upcoming' && minutesUntilStart <= 0 && now <= graceExpiry;
-  const isNoShow        = isToday && status === 'upcoming' && now > graceExpiry;
-  const isOverstay      = isToday && status === 'active'   && minutesPastEnd > 0;
+  const isNoShow = isToday && status === 'upcoming' && now > graceExpiry;
+  const isOverstay = isToday && status === 'active' && minutesPastEnd > 0;
 
   const timingState = getTimingState(status, isOverstay, isNoShow, isInGracePeriod, isArrivingSoon);
 
   return {
     minutesUntilStart, minutesPastEnd, isToday,
     isArrivingSoon, isInGracePeriod, isNoShow, isOverstay,
-    overstayMinutes:     isOverstay ? minutesPastEnd : 0,
-    gracePeriodMinLeft:  isInGracePeriod ? graceExpiry - now : 0,
+    overstayMinutes: isOverstay ? minutesPastEnd : 0,
+    gracePeriodMinLeft: isInGracePeriod ? graceExpiry - now : 0,
     gracePeriodExpiresAt: minToHHMM(graceExpiry),
-    expectedEndAt:       minToHHMM(endMin),
+    expectedEndAt: minToHHMM(endMin),
     timingState,
   };
 }
@@ -150,15 +150,15 @@ function resolveVisualState(slot: DashboardSlot, timing: BookingTiming | null, w
 }
 
 const visualConfig: Record<string, { card: string; badge: string; badgeText: string; icon: React.ComponentType<any>; iconColor: string }> = {
-  available:       { card: 'bg-white border-gray-200 hover:border-[#ee6b20] hover:shadow-md',   badge: 'bg-green-100 text-green-700',   badgeText: 'Free',    icon: CheckCircle,  iconColor: 'text-green-400' },
-  arriving_soon:   { card: 'bg-amber-50 border-amber-300 shadow-sm',                            badge: 'bg-amber-100 text-amber-700',   badgeText: 'Soon',    icon: AlarmClock,   iconColor: 'text-amber-500' },
-  in_grace_period: { card: 'bg-orange-50 border-orange-400 shadow-md animate-pulse',            badge: 'bg-orange-100 text-orange-700', badgeText: 'Grace',   icon: Timer,        iconColor: 'text-orange-500' },
-  no_show:         { card: 'bg-gray-50 border-dashed border-gray-400',                          badge: 'bg-gray-100 text-gray-500',     badgeText: 'No-show', icon: AlertOctagon, iconColor: 'text-gray-400'  },
-  occupied:        { card: 'bg-red-50 border-red-400 shadow-sm',                                badge: 'bg-red-100 text-red-700',       badgeText: 'In',      icon: Car,          iconColor: 'text-red-500'   },
-  overstay:        { card: 'bg-rose-50 border-rose-500 border-2 shadow-md',                     badge: 'bg-rose-100 text-rose-700',     badgeText: 'Over',    icon: TrendingUp,   iconColor: 'text-rose-600'  },
-  maintenance:     { card: 'bg-gray-50 border-dashed border-gray-300 opacity-50 cursor-not-allowed', badge: 'bg-gray-100 text-gray-400', badgeText: 'Maint.', icon: AlertTriangle, iconColor: 'text-gray-300' },
+  available: { card: 'bg-white border-gray-200 hover:border-[#ee6b20] hover:shadow-md', badge: 'bg-green-100 text-green-700', badgeText: 'Free', icon: CheckCircle, iconColor: 'text-green-400' },
+  arriving_soon: { card: 'bg-amber-50 border-amber-300 shadow-sm', badge: 'bg-amber-100 text-amber-700', badgeText: 'Soon', icon: AlarmClock, iconColor: 'text-amber-500' },
+  in_grace_period: { card: 'bg-orange-50 border-orange-400 shadow-md animate-pulse', badge: 'bg-orange-100 text-orange-700', badgeText: 'Grace', icon: Timer, iconColor: 'text-orange-500' },
+  no_show: { card: 'bg-gray-50 border-dashed border-gray-400', badge: 'bg-gray-100 text-gray-500', badgeText: 'No-show', icon: AlertOctagon, iconColor: 'text-gray-400' },
+  occupied: { card: 'bg-red-50 border-red-400 shadow-sm', badge: 'bg-red-100 text-red-700', badgeText: 'In', icon: Car, iconColor: 'text-red-500' },
+  overstay: { card: 'bg-rose-50 border-rose-500 border-2 shadow-md', badge: 'bg-rose-100 text-rose-700', badgeText: 'Over', icon: TrendingUp, iconColor: 'text-rose-600' },
+  maintenance: { card: 'bg-gray-50 border-dashed border-gray-300 opacity-50 cursor-not-allowed', badge: 'bg-gray-100 text-gray-400', badgeText: 'Maint.', icon: AlertTriangle, iconColor: 'text-gray-300' },
   // 'reserved' is an alias — treat same as available visually but with upcoming badge
-  reserved:        { card: 'bg-amber-50 border-amber-200 hover:shadow-md',                     badge: 'bg-amber-100 text-amber-700',   badgeText: 'Rsvd',   icon: AlarmClock,   iconColor: 'text-amber-400' },
+  reserved: { card: 'bg-amber-50 border-amber-200 hover:shadow-md', badge: 'bg-amber-100 text-amber-700', badgeText: 'Rsvd', icon: AlarmClock, iconColor: 'text-amber-400' },
 };
 
 /** Safe accessor — never returns undefined even for unknown states */
@@ -251,33 +251,33 @@ function WalkInReservationPanel({ selectedSlot, walkInForm, setWalkInForm, setSh
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
           <label htmlFor="walkin-driver" className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Driver Name *</label>
-          <Input id="walkin-driver" value={walkInForm.driverName} onChange={e => setWalkInForm({...walkInForm, driverName: e.target.value})} placeholder="Juan Dela Cruz" className="rounded-xl" />
+          <Input id="walkin-driver" value={walkInForm.driverName} onChange={e => setWalkInForm({ ...walkInForm, driverName: e.target.value })} placeholder="Juan Dela Cruz" className="rounded-xl" />
         </div>
         <div>
           <label htmlFor="walkin-plate" className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Plate *</label>
-          <Input id="walkin-plate" value={walkInForm.plateNumber} onChange={e => setWalkInForm({...walkInForm, plateNumber: e.target.value})} placeholder="ABC 123" className="rounded-xl" />
+          <Input id="walkin-plate" value={walkInForm.plateNumber} onChange={e => setWalkInForm({ ...walkInForm, plateNumber: e.target.value })} placeholder="ABC 123" className="rounded-xl" />
         </div>
         <div>
           <label htmlFor="walkin-color" className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Color</label>
-          <Input id="walkin-color" value={walkInForm.carColor} onChange={e => setWalkInForm({...walkInForm, carColor: e.target.value})} placeholder="White" className="rounded-xl" />
+          <Input id="walkin-color" value={walkInForm.carColor} onChange={e => setWalkInForm({ ...walkInForm, carColor: e.target.value })} placeholder="White" className="rounded-xl" />
         </div>
         <div>
           <label htmlFor="walkin-type" className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Type</label>
-          <select id="walkin-type" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" value={walkInForm.vehicleType} onChange={e => setWalkInForm({...walkInForm, vehicleType: e.target.value})}>
-            {['Sedan','SUV','Van','Truck','Hatchback','Motorcycle'].map(t => <option key={t}>{t}</option>)}
+          <select id="walkin-type" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" value={walkInForm.vehicleType} onChange={e => setWalkInForm({ ...walkInForm, vehicleType: e.target.value })}>
+            {['Sedan', 'SUV', 'Van', 'Truck', 'Hatchback', 'Motorcycle'].map(t => <option key={t}>{t}</option>)}
           </select>
         </div>
         <div className="col-span-2">
           <label htmlFor="walkin-phone" className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Phone</label>
-          <Input id="walkin-phone" value={walkInForm.phoneNumber} onChange={e => setWalkInForm({...walkInForm, phoneNumber: e.target.value})} placeholder="+63 912 000 0000" className="rounded-xl" />
+          <Input id="walkin-phone" value={walkInForm.phoneNumber} onChange={e => setWalkInForm({ ...walkInForm, phoneNumber: e.target.value })} placeholder="+63 912 000 0000" className="rounded-xl" />
         </div>
         <div className="col-span-2">
           <label htmlFor="walkin-brand" className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Brand</label>
-          <Input id="walkin-brand" value={walkInForm.brand} onChange={e => setWalkInForm({...walkInForm, brand: e.target.value})} placeholder="Toyota" className="rounded-xl" />
+          <Input id="walkin-brand" value={walkInForm.brand} onChange={e => setWalkInForm({ ...walkInForm, brand: e.target.value })} placeholder="Toyota" className="rounded-xl" />
         </div>
         <div className="col-span-2">
           <label htmlFor="walkin-model" className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Model</label>
-          <Input id="walkin-model" value={walkInForm.model} onChange={e => setWalkInForm({...walkInForm, model: e.target.value})} placeholder="Corolla" className="rounded-xl" />
+          <Input id="walkin-model" value={walkInForm.model} onChange={e => setWalkInForm({ ...walkInForm, model: e.target.value })} placeholder="Corolla" className="rounded-xl" />
         </div>
       </div>
       <div className="flex gap-3 pt-2 border-t">
@@ -296,7 +296,7 @@ function WalkInDetailsPanel({ walkIn, keyStr, setShowModal, handleWalkInCancel, 
         <h3 className="text-xl font-bold text-[#1e3d5a]">Walk-in Details</h3>{CatBadge}
       </div>
       <div className="space-y-2">
-        {[['Driver',walkIn.driverName],['Plate',walkIn.plateNumber],['Color',walkIn.carColor],['Vehicle',walkIn.vehicleType],['Brand',walkIn.brand],['Model',walkIn.model],['Phone',walkIn.phoneNumber]].map(([l,v]) => v ? (
+        {[['Driver', walkIn.driverName], ['Plate', walkIn.plateNumber], ['Color', walkIn.carColor], ['Vehicle', walkIn.vehicleType], ['Brand', walkIn.brand], ['Model', walkIn.model], ['Phone', walkIn.phoneNumber]].map(([l, v]) => v ? (
           <div key={l} className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="text-gray-400">{l}</span><span className="font-bold text-[#1e3d5a]">{v}</span></div>
         ) : null)}
       </div>
@@ -350,11 +350,11 @@ function UpcomingPanel({ isGrace, booking, timing, setShowModal, handleCheckIn, 
         </div>
       )}
       <div className="space-y-2">
-        {booking.user && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><User className="size-3.5"/>Customer</span><span className="font-bold">{booking.user.name}</span></div>}
-        {booking.vehicle && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Car className="size-3.5"/>Plate</span><span className="font-bold text-[#ee6b20]">{booking.vehicle.plateNumber}</span></div>}
+        {booking.user && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><User className="size-3.5" />Customer</span><span className="font-bold">{booking.user.name}</span></div>}
+        {booking.vehicle && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Car className="size-3.5" />Plate</span><span className="font-bold text-[#ee6b20]">{booking.vehicle.plateNumber}</span></div>}
         {booking.vehicle && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="text-gray-400">Vehicle</span><span className="font-bold">{booking.vehicle.brand} {booking.vehicle.model}</span></div>}
-        <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Clock className="size-3.5"/>Time</span><span className="font-bold">{booking.timeSlot}</span></div>
-        {booking.user?.phone && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Phone className="size-3.5"/>Phone</span><span className="font-bold">{booking.user.phone}</span></div>}
+        <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Clock className="size-3.5" />Time</span><span className="font-bold">{booking.timeSlot}</span></div>
+        {booking.user?.phone && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Phone className="size-3.5" />Phone</span><span className="font-bold">{booking.user.phone}</span></div>}
         <div className="flex justify-between p-3 bg-yellow-50 rounded-xl text-sm border border-yellow-100"><span className="font-medium text-yellow-800">Paid</span><span className="font-bold text-[#1e3d5a]">₱{booking.amount}</span></div>
       </div>
       <div className="flex gap-3 pt-2 border-t">
@@ -385,12 +385,12 @@ function ActivePanel({ isOver, booking, timing, setShowModal, handleCheckOut, ac
         </div>
       )}
       <div className="space-y-2">
-        {booking.user && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><User className="size-3.5"/>Customer</span><span className="font-bold">{booking.user.name}</span></div>}
-        {booking.vehicle && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Car className="size-3.5"/>Plate</span><span className="font-bold text-[#ee6b20]">{booking.vehicle.plateNumber}</span></div>}
+        {booking.user && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><User className="size-3.5" />Customer</span><span className="font-bold">{booking.user.name}</span></div>}
+        {booking.vehicle && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Car className="size-3.5" />Plate</span><span className="font-bold text-[#ee6b20]">{booking.vehicle.plateNumber}</span></div>}
         {booking.vehicle && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="text-gray-400">Vehicle</span><span className="font-bold">{booking.vehicle.brand} {booking.vehicle.model} · {booking.vehicle.color}</span></div>}
-        <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Clock className="size-3.5"/>Booked</span><span className="font-bold">{booking.timeSlot}</span></div>
-        {booking.user?.phone && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Phone className="size-3.5"/>Phone</span><span className="font-bold">{booking.user.phone}</span></div>}
-        <div className="flex justify-between p-3 bg-[#1e3d5a]/5 rounded-xl text-sm border border-[#1e3d5a]/10"><span className="flex items-center gap-2 text-[#1e3d5a] font-medium"><CreditCard className="size-3.5"/>Paid</span><span className="font-bold text-[#1e3d5a]">₱{booking.amount}</span></div>
+        <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Clock className="size-3.5" />Booked</span><span className="font-bold">{booking.timeSlot}</span></div>
+        {booking.user?.phone && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Phone className="size-3.5" />Phone</span><span className="font-bold">{booking.user.phone}</span></div>}
+        <div className="flex justify-between p-3 bg-[#1e3d5a]/5 rounded-xl text-sm border border-[#1e3d5a]/10"><span className="flex items-center gap-2 text-[#1e3d5a] font-medium"><CreditCard className="size-3.5" />Paid</span><span className="font-bold text-[#1e3d5a]">₱{booking.amount}</span></div>
       </div>
       <div className="flex gap-3 pt-2 border-t">
         <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1 rounded-xl">Close</Button>
@@ -433,8 +433,8 @@ export function SmartParkingDashboard() {
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Adaptive poll interval (server hint)
-  const pollRef       = useRef<ReturnType<typeof setInterval> | null>(null);
-  const tickRef       = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recommendedMs = useRef(45_000);
 
   // Per-second tick to refresh countdowns without API call
@@ -448,7 +448,7 @@ export function SmartParkingDashboard() {
   const [walkIns, setWalkIns] = useState<Record<string, any>>({});
   useEffect(() => { setWalkIns(loadWalkIns(selectedDate)); }, [selectedDate]);
 
-  const [walkInForm, setWalkInForm] = useState({ driverName:'', carColor:'', plateNumber:'', vehicleType:'Sedan', phoneNumber:'', brand:'', model:'' });
+  const [walkInForm, setWalkInForm] = useState({ driverName: '', carColor: '', plateNumber: '', vehicleType: 'Sedan', phoneNumber: '', brand: '', model: '' });
   const [actionLoading, setActionLoading] = useState(false);
 
   // ─── Pricing editor ────────────────────────────────────────────────────────
@@ -497,7 +497,7 @@ export function SmartParkingDashboard() {
         setSelectedLocationId(data[0]._id);
         localStorage.setItem('adminSelectedLocationId', data[0]._id);
       }
-    }).catch(() => {});
+    }).catch(() => { });
   }, []);
 
   // ─── Fetch dashboard slots ─────────────────────────────────────────────────
@@ -550,17 +550,17 @@ export function SmartParkingDashboard() {
 
   // Stats (respect no-show as "available" for operator clarity)
   const stats = {
-    total:     dashboardSlots.length,
-    available: dashboardSlots.filter(s => ['available','no_show'].includes(s.derivedStatus)).length,
-    reserved:  dashboardSlots.filter(s => ['reserved','arriving_soon','in_grace_period'].includes(s.derivedStatus)).length,
-    occupied:  dashboardSlots.filter(s => ['occupied','overstay'].includes(s.derivedStatus)).length,
-    noShow:    dashboardSlots.filter(s => s.derivedStatus === 'no_show').length,
-    overstay:  dashboardSlots.filter(s => s.derivedStatus === 'overstay').length,
+    total: dashboardSlots.length,
+    available: dashboardSlots.filter(s => ['available', 'no_show'].includes(s.derivedStatus)).length,
+    reserved: dashboardSlots.filter(s => ['reserved', 'arriving_soon', 'in_grace_period'].includes(s.derivedStatus)).length,
+    occupied: dashboardSlots.filter(s => ['occupied', 'overstay'].includes(s.derivedStatus)).length,
+    noShow: dashboardSlots.filter(s => s.derivedStatus === 'no_show').length,
+    overstay: dashboardSlots.filter(s => s.derivedStatus === 'overstay').length,
   };
 
   // Urgency flag: if any grace-period or overstay slot → faster polling hint badge
-  const hasUrgent = dashboardSlots.some(s => ['in_grace_period','overstay'].includes(s.derivedStatus));
-  const pollSecs  = Math.round(recommendedMs.current / 1000);
+  const hasUrgent = dashboardSlots.some(s => ['in_grace_period', 'overstay'].includes(s.derivedStatus));
+  const pollSecs = Math.round(recommendedMs.current / 1000);
 
   // ─── Admin actions ─────────────────────────────────────────────────────────
   const handleCheckIn = async (bookingId: string) => {
@@ -611,7 +611,7 @@ export function SmartParkingDashboard() {
     setWalkIns(updated); saveWalkIns(selectedDate, updated);
     toast.success(`Walk-in reserved for slot ${selectedSlot.dbSlot.label}`);
     setShowModal(false);
-    setWalkInForm({ driverName:'', carColor:'', plateNumber:'', vehicleType:'Sedan', phoneNumber:'', brand:'', model:'' });
+    setWalkInForm({ driverName: '', carColor: '', plateNumber: '', vehicleType: 'Sedan', phoneNumber: '', brand: '', model: '' });
   };
 
   const handleWalkInCancel = (key: string) => {
@@ -636,7 +636,7 @@ export function SmartParkingDashboard() {
       floor.rows.forEach(row => {
         for (let i = 1; i <= row.slotCount; i++) {
           const category = row.categories[i] || 'regular';
-          
+
           let dbType = 'regular';
           if (category === 'electric') dbType = 'ev_charging';
           if (category === 'pwd') dbType = 'handicapped';
@@ -685,13 +685,13 @@ export function SmartParkingDashboard() {
   // ─── Modal content ─────────────────────────────────────────────────────────
   const renderModalContent = () => {
     if (!selectedSlot) return null;
-    const key     = slotKey(selectedSlot);
-    const walkIn  = walkIns[key];
-    const timing  = getTiming(selectedSlot);
-    const visual  = resolveVisualState(selectedSlot.dbSlot, timing, walkIn);
+    const key = slotKey(selectedSlot);
+    const walkIn = walkIns[key];
+    const timing = getTiming(selectedSlot);
+    const visual = resolveVisualState(selectedSlot.dbSlot, timing, walkIn);
     const booking = selectedSlot.dbSlot.booking;
-    const Icon    = categoryIcons[selectedSlot.category];
-    const Cat     = categoryStyles[selectedSlot.category];
+    const Icon = categoryIcons[selectedSlot.category];
+    const Cat = categoryStyles[selectedSlot.category];
 
     const CatBadge = <CategoryBadge category={selectedSlot.category} Icon={Icon} Cat={Cat} />;
 
@@ -835,9 +835,9 @@ export function SmartParkingDashboard() {
           {/* Live indicator + poll interval */}
           <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 border border-gray-100">
             {isLive ? (
-              <><div className={`size-2 rounded-full ${hasUrgent ? 'bg-rose-500 animate-ping' : 'bg-green-500 animate-pulse'}`}/><Wifi className="size-4 text-green-600"/><span className="text-xs font-bold text-green-700">Live</span></>
+              <><div className={`size-2 rounded-full ${hasUrgent ? 'bg-rose-500 animate-ping' : 'bg-green-500 animate-pulse'}`} /><Wifi className="size-4 text-green-600" /><span className="text-xs font-bold text-green-700">Live</span></>
             ) : (
-              <><WifiOff className="size-4 text-gray-400"/><span className="text-xs font-bold text-gray-400">Offline</span></>
+              <><WifiOff className="size-4 text-gray-400" /><span className="text-xs font-bold text-gray-400">Offline</span></>
             )}
             {isLive && <span className="text-[10px] text-gray-400 border-l pl-2">↻ {pollSecs}s</span>}
             {lastUpdated && <span className="text-[10px] text-gray-400">{lastUpdated.toLocaleTimeString()}</span>}
@@ -869,9 +869,9 @@ export function SmartParkingDashboard() {
         </div>
         {selectedLocation && (
           <div className="flex flex-wrap gap-4 text-xs text-gray-400 pt-3 border-t border-gray-100">
-            <span className="flex items-center gap-1"><MapPin className="size-3"/>{selectedLocation.address}</span>
-            <span className="flex items-center gap-1"><Car className="size-3"/>{selectedLocation.availableSpots}/{selectedLocation.totalSpots} available</span>
-            <span className="flex items-center gap-1"><Clock className="size-3"/>{getOperatingHoursLabel(selectedLocation.operatingHours)}</span>
+            <span className="flex items-center gap-1"><MapPin className="size-3" />{selectedLocation.address}</span>
+            <span className="flex items-center gap-1"><Car className="size-3" />{selectedLocation.availableSpots}/{selectedLocation.totalSpots} available</span>
+            <span className="flex items-center gap-1"><Clock className="size-3" />{getOperatingHoursLabel(selectedLocation.operatingHours)}</span>
           </div>
         )}
       </div>
@@ -879,12 +879,12 @@ export function SmartParkingDashboard() {
       {/* Stats — 6 cards */}
       <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
         {[
-          { label: 'Total',     value: stats.total,     color: '#1e3d5a', bg: 'bg-[#1e3d5a]/5'  },
-          { label: 'Available', value: stats.available, color: '#10b981', bg: 'bg-green-50'      },
-          { label: 'Reserved',  value: stats.reserved,  color: '#f59e0b', bg: 'bg-yellow-50'     },
-          { label: 'Occupied',  value: stats.occupied,  color: '#ef4444', bg: 'bg-red-50'        },
-          { label: 'No-Show',   value: stats.noShow,    color: '#6b7280', bg: 'bg-gray-50'       },
-          { label: 'Overstay',  value: stats.overstay,  color: '#f43f5e', bg: 'bg-rose-50'       },
+          { label: 'Total', value: stats.total, color: '#1e3d5a', bg: 'bg-[#1e3d5a]/5' },
+          { label: 'Available', value: stats.available, color: '#10b981', bg: 'bg-green-50' },
+          { label: 'Reserved', value: stats.reserved, color: '#f59e0b', bg: 'bg-yellow-50' },
+          { label: 'Occupied', value: stats.occupied, color: '#ef4444', bg: 'bg-red-50' },
+          { label: 'No-Show', value: stats.noShow, color: '#6b7280', bg: 'bg-gray-50' },
+          { label: 'Overstay', value: stats.overstay, color: '#f43f5e', bg: 'bg-rose-50' },
         ].map(s => (
           <div key={s.label} className={`${s.bg} rounded-2xl p-4 border border-gray-100 text-center`}>
             <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">{s.label}</p>
@@ -896,12 +896,12 @@ export function SmartParkingDashboard() {
       {/* Legend */}
       <div className="flex flex-wrap gap-x-4 gap-y-2 bg-white rounded-2xl border border-gray-100 p-4 text-xs">
         {[
-          { color: 'bg-white border-gray-200',     label: 'Available' },
+          { color: 'bg-white border-gray-200', label: 'Available' },
           { color: 'bg-amber-50 border-amber-300', label: 'Arriving soon (<60 min)' },
           { color: 'bg-orange-50 border-orange-400', label: 'Grace period (arrived late?)' },
           { color: 'bg-gray-50 border-dashed border-gray-400', label: 'No-show (past grace)' },
-          { color: 'bg-red-50 border-red-400',     label: 'Occupied' },
-          { color: 'bg-rose-50 border-rose-500',   label: 'Overstay' },
+          { color: 'bg-red-50 border-red-400', label: 'Occupied' },
+          { color: 'bg-rose-50 border-rose-500', label: 'Overstay' },
         ].map(l => (
           <div key={l.label} className="flex items-center gap-1.5">
             <div className={`size-4 rounded border-2 ${l.color}`} />
@@ -936,19 +936,13 @@ export function SmartParkingDashboard() {
 
       {/* Pricing Editor Modal */}
       {showPricingModal && (
-        <div
-          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+        <dialog
+          open
+          aria-label="Overtime Pricing"
+          className="fixed inset-0 m-0 w-full h-full max-w-none max-h-none bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm border-0"
           onClick={() => setShowPricingModal(false)}
-          onKeyDown={e => { if (e.key === 'Escape') setShowPricingModal(false); }}
-          aria-label="Close pricing modal"
-          aria-modal="true"
-          role="dialog">
-          <div
-            className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8"
-            role="document"
-            tabIndex={-1}
-            onClick={e => e.stopPropagation()}
-            onKeyDown={e => e.stopPropagation()}>
+          onKeyDown={e => { if (e.key === 'Escape') setShowPricingModal(false); }}>
+          <div role="document" tabIndex={-1} className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-xl font-black text-[#1e3d5a]">Overtime Pricing</h3>
@@ -1035,27 +1029,21 @@ export function SmartParkingDashboard() {
               </Button>
             </div>
           </div>
-        </div>
+        </dialog>
       )}
 
       {/* Slot detail modal */}
       {showModal && selectedSlot && (
-        <div
-          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+        <dialog
+          open
+          aria-label="Slot Details"
+          className="fixed inset-0 m-0 w-full h-full max-w-none max-h-none bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm border-0"
           onClick={() => setShowModal(false)}
-          onKeyDown={e => { if (e.key === 'Escape') setShowModal(false); }}
-          aria-label="Close slot detail modal"
-          aria-modal="true"
-          role="dialog">
-          <div
-            className="bg-white rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto"
-            role="document"
-            tabIndex={-1}
-            onClick={e => e.stopPropagation()}
-            onKeyDown={e => e.stopPropagation()}>
+          onKeyDown={e => { if (e.key === 'Escape') setShowModal(false); }}>
+          <div role="document" tabIndex={-1} className="bg-white rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
             <div className="p-6 relative">{renderModalContent()}</div>
           </div>
-        </div>
+        </dialog>
       )}
     </div>
   );
