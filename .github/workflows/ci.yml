@@ -29,6 +29,8 @@ jobs:
       - name: Install Frontend deps
         run: npm ci
         working-directory: src/Frontend
+        env:
+          npm_config_cache: ~/.npm
 
       - name: ESLint
         run: npm run lint
@@ -49,12 +51,18 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: src/Frontend/package-lock.json
 
       - name: Install root deps
         run: npm ci --ignore-scripts
 
+      - name: Install Frontend deps
+        run: npm ci
+        working-directory: src/Frontend
+
       - name: Run tests
         run: npm run test:ci
+        working-directory: src/Frontend
 
   # ── Job 3: Build & push Docker image ──────────────────────────────────────
   docker:
