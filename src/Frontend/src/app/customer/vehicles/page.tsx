@@ -80,7 +80,7 @@ export default function VehiclesPage() {
     if (!form.model.trim()) { toast.error('Model is required'); return; }
     if (!form.color.trim()) { toast.error('Color is required'); return; }
 
-    const payload = { ...form, plateNumber: plate };
+    const payload = { ...form, plateNumber: plate, isDefault: false };
     try {
       if (editingId) {
         await vehiclesService.updateVehicle(editingId, payload);

@@ -274,7 +274,7 @@ export default function CustomerHomePage() {
                       <MapPin size={16} className="text-[#1e3d5a]" />
                     </div>
                     <div>
-                      <h4 className="font-bold text-[#1e3d5a] text-[15px]">{b.locationId?.name || 'Unknown Location'}</h4>
+                      <h4 className="font-bold text-[#1e3d5a] text-[15px]">{b.locationName || (typeof b.locationId === 'object' && b.locationId?.name) || 'Unknown Location'}</h4>
                       <p className="text-[11px] text-gray-400 font-bold tracking-wide mt-0.5">{b.date} • {b.timeSlot}</p>
                     </div>
                   </div>
