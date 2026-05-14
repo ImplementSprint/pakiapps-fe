@@ -543,6 +543,12 @@ export default function ProfilePage() {
                   <Shield className="size-4" />
                   {twoFAEnabled ? '2FA Enabled ✓' : 'Enable 2FA'}
                 </button>
+                <button
+                  onClick={() => router.push('/customer/payment-methods')}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border border-gray-200 text-sm font-bold text-[#1e3d5a] hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors"
+                >
+                  <span className="text-base leading-none">💙</span> GCash &amp; Payment Methods
+                </button>
               </div>
             </div>
 

@@ -15,6 +15,7 @@ const Settings = sequelize.define(
   },
   {
     tableName:  'settings',
+    schema: 'teller',
     timestamps: true,
     indexes: [
       // ── Unique key lookup ──────────────────────────────────────────────

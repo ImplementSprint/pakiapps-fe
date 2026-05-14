@@ -69,8 +69,12 @@ const seedDB = async () => {
     await sequelize.query('DROP VIEW IF EXISTS v_location_occupancy_today CASCADE;');
     await sequelize.query('DROP VIEW IF EXISTS v_slot_status_today CASCADE;');
     
-    await sequelize.sync({ alter: true });
-    console.log('Tables synced.');
+    try {
+      await sequelize.sync({ alter: true });
+      console.log('Tables synced.');
+    } catch (syncError) {
+      console.warn('⚠️  Table sync (alter) failed, but continuing seed: ' + syncError.message.split('\n')[0]);
+    }
 
     // ── Clear existing seed data ────────────────────────────────────────────
     await ParkingSlot.destroy({ where: {} });

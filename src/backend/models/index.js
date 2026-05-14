@@ -34,6 +34,8 @@ const TransactionLog = require('./TransactionLog');
 const ActivityLog    = require('./ActivityLog');
 const Upload         = require('./Upload');
 const Notification   = require('./Notification');
+const PaymentMethod  = require('./PaymentMethod');   // SCRUM-1014 GCash Link
+const OperatingHours = require('./OperatingHours');  // Partner Operating Hours
 
 // No associations — loosely coupled by design.
 
@@ -50,4 +52,6 @@ module.exports = {
   ActivityLog,
   Upload,
   Notification,
+  PaymentMethod,
+  OperatingHours,
 };

@@ -81,7 +81,19 @@ const autoAssignSlot = async (locationId, date, timeSlot, preferredFloor = null)
 const createBooking = async ({
   userId, vehicleId, locationId, parkingSlotId, spot,
   date, timeSlot, amount, paymentMethod, preferredFloor,
+  savedPaymentMethodId, // SCRUM-1018
 }) => {
+  // ── 0. Handle Saved Payment Method (Auto-Charge) ─────────────────────────
+  let finalPaymentMethod = paymentMethod;
+  if (paymentMethod === 'gcash_linked' && savedPaymentMethodId) {
+    const { PaymentMethod } = require('../models/index');
+    const method = await PaymentMethod.findOne({
+      where: { id: savedPaymentMethodId, userId: parseInt(userId) }
+    });
+    if (!method) throw new Error('Invalid or missing saved payment method');
+    // We snapshot the mobile number into the payment status or just keep it as gcash_linked
+    finalPaymentMethod = `GCash (${method.mobileNumber})`;
+  }
   // ── 1. Resolve slot (auto-assign or validate provided slot) ───────────────
   let resolvedSlotId = parkingSlotId ? parseInt(parkingSlotId) : null;
   let resolvedSpot   = spot;
@@ -134,7 +146,7 @@ const createBooking = async ({
     date,
     timeSlot,
     amount:        finalAmount,
-    paymentMethod,
+    paymentMethod: finalPaymentMethod,
     paymentStatus: 'paid',
     status:        'upcoming',
 

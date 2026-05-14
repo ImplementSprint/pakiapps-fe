@@ -37,6 +37,7 @@ const ParkingSlot = sequelize.define(
   },
   {
     tableName:  'parking_slots',
+    schema: 'parking_lot',
     timestamps: true,
     indexes: [
       // ── Unique label per location ──────────────────────────────────────

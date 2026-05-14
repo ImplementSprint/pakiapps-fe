@@ -145,7 +145,7 @@ function CheckoutModal({ booking, onConfirm, onCancel, isLoading }: {
           </div>
           <h3 className="text-2xl font-black text-white">Check-Out Summary</h3>
           <p className="text-white/60 text-sm mt-1">
-            <span className="font-bold text-[#ee6b20]">{booking.reference}</span> · {(booking.userId as any)?.name || 'Customer'}
+            <span className="font-bold text-[#ee6b20]">{booking.reference}</span> · {booking.userName || (booking.userId as any)?.name || 'Customer'}
           </p>
         </div>
 
@@ -229,7 +229,7 @@ function BookingRow({ booking, onCheckIn, onCheckOut, actionId, now }: {
         <div className="min-w-0">
           <p className="font-bold text-[#1e3d5a] text-sm truncate">{booking.reference}</p>
           <p className="text-xs text-gray-500 truncate">
-            {(booking.userId as any)?.name || 'Customer'} · {(booking.vehicleId as any)?.plateNumber || '—'}
+            {booking.userName || (booking.userId as any)?.name || 'Customer'} · {booking.vehiclePlate || (booking.vehicleId as any)?.plateNumber || '—'}
           </p>
         </div>
       </div>
@@ -376,14 +376,14 @@ export default function TellerHomePage() {
   const doCheckIn = async (booking: Booking) => {
     setActionId(booking._id);
     try {
-      await bookingService.updateBookingStatus(booking._id, 'active');
-      const at = new Date().toISOString();
+      const updated = await bookingService.checkIn(booking._id);
+      const at = updated.checkInAt ?? new Date().toISOString();
       toast.success(`✅ Checked in! Spot ${booking.spot} is now active.`);
       const patch = (b: Booking) => b._id === booking._id ? { ...b, status: 'active' as const, checkInAt: at } : b;
       setBookings(prev => prev.map(patch));
       setScannedBooking(prev => prev?._id === booking._id ? { ...prev, status: 'active', checkInAt: at } : prev);
     } catch (err: any) {
-      toast.error(err?.message || 'Check-in failed.');
+      toast.error(err?.response?.data?.message || err?.message || 'Check-in failed.');
     } finally {
       setActionId(null);
     }
@@ -632,10 +632,12 @@ export default function TellerHomePage() {
 
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           {[
-                            { icon: <User className="size-3.5" />,   label: 'Customer', value: (scannedBooking.userId as any)?.name || '—' },
-                            { icon: <Car className="size-3.5" />,    label: 'Plate',    value: (scannedBooking.vehicleId as any)?.plateNumber || '—' },
+                            { icon: <User className="size-3.5" />,   label: 'Customer', value: scannedBooking.userName || (scannedBooking.userId as any)?.name || '—' },
+                            { icon: <Car className="size-3.5" />,    label: 'Plate',    value: scannedBooking.vehiclePlate || (scannedBooking.vehicleId as any)?.plateNumber || '—' },
                             { icon: <Clock className="size-3.5" />,  label: 'Time',     value: scannedBooking.timeSlot },
                             { icon: <MapPin className="size-3.5" />, label: 'Spot',     value: `Spot ${scannedBooking.spot}` },
+                            ...(scannedBooking.userPhone ? [{ icon: <User className="size-3.5" />, label: 'Phone', value: scannedBooking.userPhone }] : []),
+                            ...(scannedBooking.locationName ? [{ icon: <MapPin className="size-3.5" />, label: 'Location', value: scannedBooking.locationName }] : []),
                           ].map(r => (
                             <div key={r.label} className="bg-white rounded-xl p-2.5 border border-gray-100">
                               <div className="flex items-center gap-1.5 text-gray-400 mb-1">{r.icon}<span className="font-bold uppercase tracking-widest text-[9px]">{r.label}</span></div>

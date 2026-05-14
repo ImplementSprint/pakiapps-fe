@@ -22,4 +22,9 @@ export const locationsService = {
     const res = await api.delete(`/locations/${id}`);
     return res.data;
   },
+  /** Partner: list only the locations belonging to the current user */
+  async getMyLocations() {
+    const res = await api.get('/locations?mine=true');
+    return res.data?.locations ?? res.data ?? [];
+  },
 };

@@ -2,6 +2,7 @@ import { api } from '../lib/api';
 
 export interface Booking {
   _id: string;
+  id?: number;
   reference: string;
   barcode?: string;
   spot: string;
@@ -10,13 +11,30 @@ export interface Booking {
   type: string;
   status: 'upcoming' | 'active' | 'completed' | 'cancelled' | 'no_show';
   amount: number;
+  finalAmount?: number;
   paymentMethod: string;
   paymentStatus: 'paid' | 'pending' | 'partial' | 'refunded';
   checkInAt?: string | null;
   checkOutAt?: string | null;
-  userId?: { _id: string; name: string; email: string; phone?: string };
-  vehicleId?: { _id: string; brand: string; model: string; plateNumber: string; type: string };
-  locationId?: { _id: string; name: string; address: string };
+  checkedInByTeller?: boolean;
+
+  // ── Snapshot columns (populated at booking-creation time — no JOIN needed) ──
+  userName?: string;
+  userEmail?: string;
+  userPhone?: string;
+  vehicleBrand?: string;
+  vehicleModel?: string;
+  vehiclePlate?: string;
+  vehicleType?: string;
+  vehicleColor?: string;
+  locationName?: string;
+  locationAddress?: string;
+
+  // Legacy nested shape (kept for backward compatibility with older code)
+  userId?: { _id: string; name: string; email: string; phone?: string } | number;
+  vehicleId?: { _id: string; brand: string; model: string; plateNumber: string; type: string } | number;
+  locationId?: { _id: string; name: string; address: string } | number;
+
   createdAt: string;
   cancelledAt?: string;
   cancelReason?: string;
@@ -83,5 +101,11 @@ export const bookingService = {
   async getAvailableSlots(locationId: string, date: string) {
     const res = await api.get<any[]>(`/bookings/slots/${locationId}?date=${date}`);
     return res.data!;
+  },
+
+  /** Teller check-in (SCRUM-1007) — uses dedicated /checkin endpoint */
+  async checkIn(id: string): Promise<Booking> {
+    const res = await api.patch<any>(`/bookings/${id}/checkin`, {});
+    return (res.data?.data ?? res.data) as Booking;
   },
 };

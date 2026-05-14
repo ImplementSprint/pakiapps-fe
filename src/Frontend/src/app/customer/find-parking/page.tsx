@@ -72,7 +72,7 @@ export default function FindParkingPage() {
   useEffect(() => {
     const t = setTimeout(async () => {
       if (!isLoading) {
-        try { setLocations(await locationsService.getLocations(searchQuery)); } catch {}
+        try { setLocations(await locationsService.getLocations(searchQuery)); } catch { /* ignore */ }
       }
     }, 400);
     return () => clearTimeout(t);

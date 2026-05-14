@@ -42,6 +42,7 @@ const categoryInfo = {
   compact: { label: 'Compact', icon: Grid3x3, color: 'bg-teal-500', textColor: 'text-teal-700' },
 };
 
+// eslint-disable-next-line no-redeclare
 export function AdvancedParkingConfig({ isOpen, onClose, onSave, currentConfig }: AdvancedParkingConfigProps) {
   const [step, setStep] = useState(1);
   const [floors, setFloors] = useState(currentConfig?.floors || 1);

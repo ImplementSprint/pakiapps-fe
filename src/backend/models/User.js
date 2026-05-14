@@ -5,9 +5,10 @@ const User = sequelize.define(
   'User',
   {
     id:             { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    authId:         { type: DataTypes.UUID,    allowNull: true,  unique: true },  // Supabase auth.users UUID
     name:           { type: DataTypes.STRING,  allowNull: false },
     email:          { type: DataTypes.STRING,  allowNull: false, unique: true },
-    password:       { type: DataTypes.STRING,  allowNull: false },
+    password:       { type: DataTypes.STRING,  allowNull: true },  // nullable — Supabase Auth owns credentials
     phone:          { type: DataTypes.STRING },
     role:           { type: DataTypes.ENUM('customer', 'admin', 'teller', 'business_partner'), defaultValue: 'customer' },
     profilePicture: { type: DataTypes.TEXT,    defaultValue: null },
@@ -44,9 +45,11 @@ const User = sequelize.define(
   },
   {
     tableName:  'users',
+    schema: 'account',
     timestamps: true,
     indexes: [
       { name: 'users_email_unique', unique: true, fields: ['email'] },
+      { name: 'users_auth_id_unique', unique: true, fields: ['authId'] },
       { name: 'idx_users_role', fields: ['role'] },
       { name: 'idx_users_name', fields: ['name'] },
       { name: 'idx_users_discount_status', fields: ['discountStatus'] },

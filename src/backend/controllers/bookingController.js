@@ -180,6 +180,73 @@ const getAvailableSlots = async (req, res) => {
   }
 };
 
+// PATCH /api/bookings/:id/checkin — teller marks customer as checked in (SCRUM-1007)
+// Rules:
+//   • Booking must be 'upcoming'
+//   • Check-in is allowed from 15 minutes BEFORE the slot start time up to the slot end
+//   • Sets status → 'active', records checkInAt, flags checkedInByTeller = true
+const notificationService = require('../services/notificationService');
+const checkInBooking = async (req, res) => {
+  try {
+    const booking = await Booking.findByPk(parseInt(req.params.id));
+    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+    if (booking.status !== 'upcoming') {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot check in — booking status is '${booking.status}'. Only 'upcoming' bookings can be checked in.`,
+      });
+    }
+
+    // Parse slot start time from "HH:MM - HH:MM" format, e.g. "10:00 - 11:00"
+    const [startStr] = (booking.timeSlot || '').split(' - ');
+    const bookingDate = booking.date; // YYYY-MM-DD
+    const slotStart  = startStr ? new Date(`${bookingDate}T${startStr}:00`) : null;
+    const slotEnd    = slotStart ? new Date(slotStart.getTime() + 60 * 60 * 1000) : null;
+    const now        = new Date();
+    const GRACE_MS   = 15 * 60 * 1000; // 15 minutes
+
+    if (slotStart) {
+      const earliest = new Date(slotStart.getTime() - GRACE_MS);
+      if (now < earliest) {
+        const minsUntil = Math.ceil((earliest - now) / 60000);
+        return res.status(400).json({
+          success: false,
+          message: `Too early to check in — check-in opens ${minsUntil} minute(s) before the slot starts (${startStr}).`,
+        });
+      }
+      if (slotEnd && now > slotEnd) {
+        return res.status(400).json({
+          success: false,
+          message: `Check-in window has passed — this slot ended at ${(booking.timeSlot || '').split(' - ')[1]}.`,
+        });
+      }
+    }
+
+    await booking.update({
+      status:            'active',
+      checkInAt:         now,
+      checkedInByTeller: true,
+    });
+
+    const formatted = formatBooking(booking.toJSON());
+
+    // Notify the customer in-app
+    notificationService.notifySystem(
+      booking.userId,
+      '✅ Checked In!',
+      `You have been successfully checked in by the teller for slot ${booking.spot} at ${booking.locationName}. Reference: ${booking.reference}`
+    );
+
+    res.json({
+      success: true,
+      message: 'Customer checked in successfully',
+      data:    formatted,
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   createBooking,
   getMyBookings,
@@ -187,6 +254,7 @@ module.exports = {
   getBookingById,
   cancelBooking,
   updateBookingStatus,
+  checkInBooking,
   checkOutBooking,
   getAvailableSlots,
 };

@@ -9,16 +9,33 @@
     "install:all":    "cd src/Backend && npm install && cd ../Frontend && npm install",
     "build:backend":  "cd src/Backend && npm run build",
     "build:frontend": "cd src/Frontend && npm run build",
-    "test":           "jest"
+    "lint":           "eslint src/Frontend/src --ext .ts,.tsx,.js,.jsx",
+    "lint:fix":       "eslint src/Frontend/src --ext .ts,.tsx,.js,.jsx --fix",
+    "test":           "jest --testPathPattern=tests/unit --coverageReporters=json-summary --forceExit",
+    "test:ci":        "jest --testPathPattern=tests/unit --coverageReporters=json-summary --ci --forceExit"
+  },
+  "overrides": {
+    "lodash": "^4.17.21",
+    "next": "15.5.18",
+    "postcss": "^8.5.10"
   },
   "devDependencies": {
+    "@eslint/js": "^9.27.0",
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^15.0.2",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/jest": "^29.5.12",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^8.32.0",
+    "@typescript-eslint/parser": "^8.32.0",
+    "eslint": "^9.27.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^16.1.0",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
-    "next": "15.3.0",
+    "next": "15.5.18",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "typescript": "^5.3.3"

@@ -4,14 +4,16 @@
   "description": "PakiPark Parking Reservation System - Backend API (PostgreSQL/Sequelize)",
   "main": "server.js",
   "scripts": {
-    "start":        "node server.js",
-    "dev":          "nodemon server.js",
-    "seed":         "node config/seed.js",
-    "db:sync":      "node scripts/syncSchema.js",
-    "db:sync:force":"node scripts/syncSchema.js --force",
-    "db:indexes":   "node scripts/syncSchema.js --indexes-only"
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "seed": "node config/seed.js",
+    "seed:auth": "node config/seed-auth.js",
+    "db:sync": "node scripts/syncSchema.js",
+    "db:sync:force": "node scripts/syncSchema.js --force",
+    "db:indexes": "node scripts/syncSchema.js --indexes-only"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.104.1",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

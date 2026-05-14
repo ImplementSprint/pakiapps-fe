@@ -57,6 +57,7 @@ const ActivityLog = sequelize.define(
   },
   {
     tableName:  'activity_logs',
+    schema: 'partner',
     timestamps: true,
     updatedAt:  false,   // logs are append-only — no updates
     indexes: [

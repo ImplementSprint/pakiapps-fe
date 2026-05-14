@@ -45,6 +45,7 @@ const TransactionLog = sequelize.define(
   },
   {
     tableName:  'transaction_logs',
+    schema: 'reservation',
     timestamps: true,
     updatedAt:  false,   // logs are append-only — no updates
     indexes: [

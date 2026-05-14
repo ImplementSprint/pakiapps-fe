@@ -41,13 +41,16 @@ const Booking = sequelize.define(
     },
     amount:        { type: DataTypes.FLOAT, allowNull: false },
     paymentMethod: {
-      type: DataTypes.ENUM('GCash', 'PayMaya', 'Credit/Debit Card'),
+      type: DataTypes.ENUM('GCash', 'PayMaya', 'Credit/Debit Card', 'gcash_linked'),
       allowNull: false,
     },
     paymentStatus: {
       type: DataTypes.ENUM('paid', 'pending', 'partial', 'refunded'),
       defaultValue: 'pending',
     },
+
+    // ── Teller / Operation flags ──────────────────────────────────────────────
+    checkedInByTeller: { type: DataTypes.BOOLEAN, defaultValue: false },
 
     // ── Lifecycle timestamps ───────────────────────────────────────────────────
     checkInAt:       { type: DataTypes.DATE, allowNull: true },
@@ -76,6 +79,7 @@ const Booking = sequelize.define(
   },
   {
     tableName:  'bookings',
+    schema: 'reservation',
     timestamps: true,
     indexes: [
       // ── Unique constraints ─────────────────────────────────────────────────

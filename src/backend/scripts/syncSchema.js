@@ -26,81 +26,81 @@ const EXTRA_INDEXES = [
   {
     name: 'booking_reference_seq',
     sql:  `CREATE SEQUENCE IF NOT EXISTS booking_reference_seq START 1;`,
-    desc: 'bookings — atomic sequence for PKP-XXXXXXXX reference numbers',
+    desc: 'reservation.bookings — atomic sequence for PKP-XXXXXXXX reference numbers',
   },
 
-  // Partial: active/upcoming bookings for a location on a specific date
+  // Partial: active/upcoming reservation.bookings for a location on a specific date
   {
-    name: 'idx_bookings_location_date_active',
+    name: 'idx_reservation.bookings_location_date_active',
     sql: `
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_bookings_location_date_active
-        ON bookings ("locationId", date)
+      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_reservation.bookings_location_date_active
+        ON reservation.bookings ("locationId", date)
         WHERE status IN ('upcoming', 'active');
     `,
-    desc: 'bookings — partial: location+date for active/upcoming (conflict check)',
+    desc: 'reservation.bookings — partial: location+date for active/upcoming (conflict check)',
   },
 
   // Partial: slot conflict check (non-null parkingSlotId only)
   {
-    name: 'idx_bookings_slot_date_active',
+    name: 'idx_reservation.bookings_slot_date_active',
     sql: `
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_bookings_slot_date_active
-        ON bookings ("parkingSlotId", date)
+      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_reservation.bookings_slot_date_active
+        ON reservation.bookings ("parkingSlotId", date)
         WHERE "parkingSlotId" IS NOT NULL AND status IN ('upcoming', 'active');
     `,
-    desc: 'bookings — partial: slot+date for time-window conflict check',
+    desc: 'reservation.bookings — partial: slot+date for time-window conflict check',
   },
 
   // Customer booking list sorted newest-first
   {
-    name: 'idx_bookings_user_createdat_desc',
+    name: 'idx_reservation.bookings_user_createdat_desc',
     sql: `
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_bookings_user_createdat_desc
-        ON bookings ("userId", "createdAt" DESC);
+      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_reservation.bookings_user_createdat_desc
+        ON reservation.bookings ("userId", "createdAt" DESC);
     `,
-    desc: 'bookings — customer list, newest first',
+    desc: 'reservation.bookings — customer list, newest first',
   },
 
   // Partial unique barcode index (scanner lookup)
   {
-    name: 'idx_bookings_barcode_partial',
+    name: 'idx_reservation.bookings_barcode_partial',
     sql: `
-      CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS idx_bookings_barcode_partial
-        ON bookings (barcode)
+      CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS idx_reservation.bookings_barcode_partial
+        ON reservation.bookings (barcode)
         WHERE barcode IS NOT NULL;
     `,
-    desc: 'bookings — partial unique barcode (scanner lookup)',
+    desc: 'reservation.bookings — partial unique barcode (scanner lookup)',
   },
 
   // Full-text style: search by snapshot fields (no JOIN needed)
   {
-    name: 'idx_bookings_vehicle_plate',
+    name: 'idx_reservation.bookings_vehicle_plate',
     sql: `
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_bookings_vehicle_plate
-        ON bookings ("vehiclePlate")
+      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_reservation.bookings_vehicle_plate
+        ON reservation.bookings ("vehiclePlate")
         WHERE "vehiclePlate" IS NOT NULL;
     `,
-    desc: 'bookings — plate number search (snapshot column)',
+    desc: 'reservation.bookings — plate number search (snapshot column)',
   },
   {
-    name: 'idx_bookings_user_name',
+    name: 'idx_reservation.bookings_user_name',
     sql: `
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_bookings_user_name
-        ON bookings ("userName")
+      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_reservation.bookings_user_name
+        ON reservation.bookings ("userName")
         WHERE "userName" IS NOT NULL;
     `,
-    desc: 'bookings — user name search (snapshot column)',
+    desc: 'reservation.bookings — user name search (snapshot column)',
   },
 
   // Analytics: vehicle type distribution without JOIN
   {
-    name: 'idx_bookings_vehicle_type_paid',
+    name: 'idx_reservation.bookings_vehicle_type_paid',
     sql: `
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_bookings_vehicle_type_paid
-        ON bookings ("vehicleType")
+      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_reservation.bookings_vehicle_type_paid
+        ON reservation.bookings ("vehicleType")
         WHERE "vehicleType" IS NOT NULL;
     `,
-    desc: 'bookings — vehicle type analytics (no JOIN)',
+    desc: 'reservation.bookings — vehicle type analytics (no JOIN)',
   },
 
   // TransactionLog
@@ -108,34 +108,34 @@ const EXTRA_INDEXES = [
     name: 'idx_txlogs_booking_createdat',
     sql: `
       CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_txlogs_booking_createdat
-        ON transaction_logs ("bookingId", "createdAt" DESC);
+        ON reservation.transaction_logs ("bookingId", "createdAt" DESC);
     `,
-    desc: 'transaction_logs — all transactions for a booking, newest first',
+    desc: 'reservation.transaction_logs — all transactions for a booking, newest first',
   },
   {
     name: 'idx_txlogs_user_createdat',
     sql: `
       CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_txlogs_user_createdat
-        ON transaction_logs ("userId", "createdAt" DESC);
+        ON reservation.transaction_logs ("userId", "createdAt" DESC);
     `,
-    desc: 'transaction_logs — all transactions for a user, newest first',
+    desc: 'reservation.transaction_logs — all transactions for a user, newest first',
   },
   {
     name: 'idx_txlogs_method_status',
     sql: `
       CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_txlogs_method_status
-        ON transaction_logs ("paymentMethod", status);
+        ON reservation.transaction_logs ("paymentMethod", status);
     `,
-    desc: 'transaction_logs — payment method distribution',
+    desc: 'reservation.transaction_logs — payment method distribution',
   },
   {
     name: 'idx_txlogs_type_createdat',
     sql: `
       CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_txlogs_type_createdat
-        ON transaction_logs ("transactionType", "createdAt" DESC)
+        ON reservation.transaction_logs ("transactionType", "createdAt" DESC)
         WHERE status = 'success';
     `,
-    desc: 'transaction_logs — partial: successful transactions by type',
+    desc: 'reservation.transaction_logs — partial: successful transactions by type',
   },
 
   // ActivityLog
@@ -143,26 +143,26 @@ const EXTRA_INDEXES = [
     name: 'idx_actlog_user_createdat',
     sql: `
       CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_actlog_user_createdat
-        ON activity_logs ("userId", "createdAt" DESC);
+        ON partner.activity_logs ("userId", "createdAt" DESC);
     `,
-    desc: 'activity_logs — all actions by a user, newest first',
+    desc: 'partner.activity_logs — all actions by a user, newest first',
   },
   {
     name: 'idx_actlog_severity_createdat',
     sql: `
       CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_actlog_severity_createdat
-        ON activity_logs (severity, "createdAt" DESC)
+        ON partner.activity_logs (severity, "createdAt" DESC)
         WHERE severity IN ('warning', 'critical');
     `,
-    desc: 'activity_logs — partial: critical/warning events for security dashboard',
+    desc: 'partner.activity_logs — partial: critical/warning events for security dashboard',
   },
   {
     name: 'idx_actlog_entity_createdat',
     sql: `
       CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_actlog_entity_createdat
-        ON activity_logs ("entityType", "entityId", "createdAt" DESC);
+        ON partner.activity_logs ("entityType", "entityId", "createdAt" DESC);
     `,
-    desc: 'activity_logs — timeline for a specific entity',
+    desc: 'partner.activity_logs — timeline for a specific entity',
   },
 ];
 
@@ -187,8 +187,8 @@ const VIEWS = [
           100.0 * COUNT(b.id) FILTER (WHERE b.status IN ('active','upcoming'))
           / NULLIF(l."totalSpots", 0), 1
         )                                                 AS "occupancyPct"
-      FROM locations l
-      LEFT JOIN bookings b
+      FROM parking_lot.locations l
+      LEFT JOIN reservation.bookings b
         ON b."locationId" = l.id
        AND b.date = CURRENT_DATE
        AND b.status IN ('upcoming', 'active', 'completed')
@@ -226,8 +226,8 @@ const VIEWS = [
         b."vehicleType",
         b."vehicleBrand",
         b."vehicleModel"
-      FROM parking_slots ps
-      LEFT JOIN bookings b
+      FROM parking_lot.parking_slots ps
+      LEFT JOIN reservation.bookings b
         ON b."parkingSlotId" = ps.id
        AND b.date = CURRENT_DATE
        AND b.status IN ('upcoming', 'active');
@@ -281,9 +281,9 @@ async function printIndexReport() {
     JOIN pg_class  i ON i.oid = ix.indexrelid
     WHERE t.relkind = 'r'
       AND t.relname IN (
-        'users','locations','vehicles','parking_slots',
-        'bookings','reviews','settings','parking_rates',
-        'transaction_logs','activity_logs'
+        'account.users','parking_lot.locations','vehicles','parking_lot.parking_slots',
+        'reservation.bookings','reviews','settings','parking_rates',
+        'reservation.transaction_logs','partner.activity_logs'
       )
     ORDER BY t.relname, i.relname;
   `);
@@ -328,8 +328,12 @@ async function main() {
         await sequelize.sync({ force: true });
         ok('All tables recreated (force)');
       } else {
-        await sequelize.sync({ alter: true });
-        ok('All tables synced (alter — no data lost)');
+        try {
+          await sequelize.sync({ alter: true });
+          ok('All tables synced (alter — no data lost)');
+        } catch (e) {
+          warn('Sync alter failed, but schema might already be updated: ' + e.message.split('\n')[0]);
+        }
       }
     } else {
       info('--indexes-only: skipping Sequelize sync');

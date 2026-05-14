@@ -1,8 +1,17 @@
-const jwt = require('jsonwebtoken');
-const { User } = require('../models/index');
+'use strict';
+/**
+ * auth.js — JWT middleware (Supabase edition)
+ * ============================================
+ * Supabase-issued JWTs are verified using SUPABASE_JWT_SECRET.
+ * After verification the matching account.users profile row is attached
+ * to req.user so the rest of the app sees the same shape as before.
+ */
+
+const jwt         = require('jsonwebtoken');
+const { sequelize } = require('../config/db');
 
 /**
- * Protect routes — verify JWT and attach user to request
+ * Protect routes — verify Supabase JWT and attach profile to request.
  */
 const protect = async (req, res, next) => {
   try {
@@ -16,20 +25,33 @@ const protect = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'Not authorized, no token' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findByPk(decoded.id);
+    // Verify against Supabase JWT secret (HS256)
+    const secret  = process.env.SUPABASE_JWT_SECRET;
+    const decoded = jwt.verify(token, secret);
+
+    // decoded.sub is the auth.users uuid
+    const authId = decoded.sub;
+
+    // Fetch the account.users profile linked to this auth identity
+    const [rows] = await sequelize.query(
+      `SELECT * FROM account.users WHERE "authId" = :authId LIMIT 1`,
+      { replacements: { authId } },
+    );
+
+    const user = rows[0];
 
     if (!user) {
-      return res.status(401).json({ success: false, message: 'User not found' });
+      return res.status(401).json({ success: false, message: 'User profile not found' });
     }
 
     if (user.deletedAt) {
       return res.status(401).json({ success: false, message: 'This account has been deleted' });
     }
 
-    // Attach instance to request; expose both .id and ._id for compatibility
-    req.user = user;
-    req.user._id = user.id;
+    // Attach to request — expose both .id and ._id for compatibility
+    req.user      = user;
+    req.user._id  = user.id;
+    req.user.authId = authId;
 
     next();
   } catch (error) {

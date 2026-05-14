@@ -20,6 +20,7 @@ const Vehicle = sequelize.define(
   },
   {
     tableName:  'vehicles',
+    schema: 'teller',
     timestamps: true,
     indexes: [
       // SELECT * FROM vehicles WHERE "userId"=$1

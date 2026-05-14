@@ -1,3 +1,4 @@
+'use strict';
 const authService = require('../services/authService');
 
 // POST /api/auth/register/customer
@@ -30,9 +31,29 @@ const login = async (req, res) => {
   }
 };
 
+// POST /api/auth/refresh
+const refresh = async (req, res) => {
+  try {
+    const tokens = await authService.refreshToken(req.body);
+    res.json({ success: true, data: tokens });
+  } catch (error) {
+    res.status(401).json({ success: false, message: error.message });
+  }
+};
+
+// POST /api/auth/logout
+const logout = async (req, res) => {
+  try {
+    await authService.logoutUser(req.body);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
 // GET /api/auth/me
 const getMe = async (req, res) => {
   res.json({ success: true, data: req.user });
 };
 
-module.exports = { registerCustomer, registerAdmin, login, getMe };
+module.exports = { registerCustomer, registerAdmin, login, refresh, logout, getMe };

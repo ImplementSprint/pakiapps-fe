@@ -9,6 +9,7 @@ const {
   getBookingById,
   cancelBooking,
   updateBookingStatus,
+  checkInBooking,
   checkOutBooking,
   getAvailableSlots,
 } = require('../controllers/bookingController');
@@ -24,7 +25,9 @@ router.get('/:id', protect, getBookingById);
 
 // ── Staff routes (admin, teller, business_partner) ────────────────────────────
 router.get('/', protect, adminOrTeller, getAllBookings);
-router.patch('/:id/status', protect, adminOrTeller, updateBookingStatus);
+router.patch('/:id/status',   protect, adminOrTeller, updateBookingStatus);
+// Teller check-in (SCRUM-1007) — validates 15-min grace period
+router.patch('/:id/checkin',  protect, adminOrTeller, checkInBooking);
 // Checkout with time-based billing (₱15/hr for overtime beyond reserved slot)
 router.patch('/:id/checkout', protect, adminOrTeller, checkOutBooking);
 

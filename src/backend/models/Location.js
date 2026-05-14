@@ -32,6 +32,7 @@ const Location = sequelize.define(
   },
   {
     tableName:  'locations',
+    schema: 'parking_lot',
     timestamps: true,
     indexes: [
       // ── Active locations list (most common public query) ───────────────

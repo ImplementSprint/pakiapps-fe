@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import RootLayout, { metadata } from '../../src/Frontend/src/app/layout';
+import RootLayout, { metadata } from '../../src/app/layout';
 
 /**
  * PakiPark UI smoke tests.

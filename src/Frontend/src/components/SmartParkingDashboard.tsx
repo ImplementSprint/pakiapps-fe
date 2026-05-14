@@ -282,7 +282,7 @@ export function SmartParkingDashboard() {
     if (!selectedLocationId) return;
     const saved = localStorage.getItem(`pricing_${selectedLocationId}`);
     if (saved) {
-      try { setPricingForm(JSON.parse(saved)); } catch {}
+      try { setPricingForm(JSON.parse(saved)); } catch { /* ignore */ }
     } else {
       setPricingForm({ freeHours: 2, overtimeRate: 15 }); // defaults
     }

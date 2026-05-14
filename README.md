@@ -91,5 +91,3 @@ Open [http://localhost:3000](http://localhost:3000)
 - [x] Sequelize Database Synchronization
 
 ---
-
-*PakiPark · Built for CCDI Capstone · 2026*

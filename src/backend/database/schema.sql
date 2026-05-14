@@ -236,6 +236,49 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_barcode
   WHERE barcode IS NOT NULL;
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- TABLE: payment_methods
+-- Stores saved payment methods linked by customers (GCash, etc.)
+-- SCRUM-1014 (GCash Link) / SCRUM-1018 (Auto-Charge)
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS payment_methods (
+  id             SERIAL       PRIMARY KEY,
+  "userId"       INTEGER      NOT NULL,
+  provider       VARCHAR(30)  NOT NULL DEFAULT 'GCash',  -- 'GCash' | 'PayMaya' | 'card'
+  mobile_number  VARCHAR(20),                             -- 09XXXXXXXXX
+  display_label  VARCHAR(60),                             -- e.g. "GCash •••• 1234"
+  is_default     BOOLEAN      NOT NULL DEFAULT false,
+  "createdAt"    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  "updatedAt"    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  CONSTRAINT fk_payment_methods_user
+    FOREIGN KEY ("userId") REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_payment_methods_user ON payment_methods ("userId");
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- TABLE: operating_hours
+-- Stores per-day open/close schedule for each parking location.
+-- Partner Operating Hours story.
+-- day_of_week: 0 = Sunday … 6 = Saturday
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS operating_hours (
+  id            SERIAL   PRIMARY KEY,
+  "locationId"  INTEGER  NOT NULL,
+  day_of_week   SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+  open_time     TIME,                          -- NULL if is_closed = true
+  close_time    TIME,
+  is_closed     BOOLEAN  NOT NULL DEFAULT false,
+  "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT fk_operating_hours_location
+    FOREIGN KEY ("locationId") REFERENCES locations(id) ON DELETE CASCADE,
+  CONSTRAINT uq_operating_hours_location_day
+    UNIQUE ("locationId", day_of_week)
+);
+
+CREATE INDEX IF NOT EXISTS idx_operating_hours_location ON operating_hours ("locationId");
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- TABLE: reviews
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS reviews (

@@ -15,6 +15,7 @@ import Barcode from 'react-barcode';
 import { bookingService } from '@/services/bookingService';
 import { parkingSlotService, ParkingSlot } from '@/services/parkingSlotService';
 import { vehiclesService } from '@/services/vehiclesService';
+import { paymentMethodService, PaymentMethod } from '@/services/paymentMethodService';
 
 const LOGO_SRC = '/assets/430f6b7df4e30a8a6fddb7fbea491ba629555e7c.png';
 
@@ -77,7 +78,26 @@ function BookParkingContent() {
     selectedSlot: '',
     selectedParkingSlot: null as ParkingSlot | null,
     paymentMethod: 'GCash',
+    savedPaymentMethodId: null as number | null,
   });
+
+  const [savedMethods, setSavedMethods] = useState<PaymentMethod[]>([]);
+  const [isLoadingMethods, setIsLoadingMethods] = useState(false);
+
+  useEffect(() => {
+    setIsLoadingMethods(true);
+    paymentMethodService.getAll().then(methods => {
+      setSavedMethods(methods);
+      const def = methods.find(m => m.isDefault);
+      if (def) {
+        setBookingData(prev => ({
+          ...prev,
+          paymentMethod: 'gcash_linked',
+          savedPaymentMethodId: def.id
+        }));
+      }
+    }).finally(() => setIsLoadingMethods(false));
+  }, []);
 
   const [cardDetails, setCardDetails] = useState({ number: '', name: '', expiry: '', cvv: '' });
   const [focusedField, setFocusedField] = useState<'number' | 'name' | 'expiry' | 'cvv' | null>(null);
@@ -194,6 +214,7 @@ function BookParkingContent() {
         spot: bookingData.selectedParkingSlot?.label || 'Auto-Assigned',
         date: bookingData.date, timeSlot: bookingData.selectedSlot,
         amount: HOURLY_RATE, paymentMethod: bookingData.paymentMethod,
+        savedPaymentMethodId: bookingData.savedPaymentMethodId,
         ...(bookingData.selectedParkingSlot ? { parkingSlotId: bookingData.selectedParkingSlot._id || bookingData.selectedParkingSlot.id } : {}),
       } as any);
 
@@ -521,6 +542,37 @@ function BookParkingContent() {
                   </h3>
                   
                   <div className="space-y-4">
+                    {/* Saved Payment Methods (Auto-Charge SCRUM-1018) */}
+                    {savedMethods.length > 0 && (
+                      <div className={`border-2 rounded-2xl overflow-hidden transition-all ${bookingData.paymentMethod === 'gcash_linked' ? 'border-[#ee6b20]' : 'border-gray-100'}`}>
+                        <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => setBookingData({ ...bookingData, paymentMethod: 'gcash_linked', savedPaymentMethodId: savedMethods[0].id })}>
+                          <div className="flex items-center gap-3">
+                            <div className="size-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">💙</div>
+                            <div>
+                              <p className="font-bold text-[#1e3d5a] leading-tight">Saved GCash (Linked)</p>
+                              <p className="text-xs text-gray-500 font-medium">Auto-Charge enabled</p>
+                            </div>
+                          </div>
+                          <ChevronDown className="size-5 text-gray-400" />
+                        </div>
+                        {bookingData.paymentMethod === 'gcash_linked' && (
+                          <div className="px-4 pb-4 pt-2 border-t border-gray-100 bg-gray-50/50 space-y-2">
+                            {savedMethods.map(m => (
+                              <button key={m.id} type="button" onClick={() => setBookingData({ ...bookingData, paymentMethod: 'gcash_linked', savedPaymentMethodId: m.id })} 
+                                className={`w-full p-4 rounded-xl border flex items-center justify-between transition-all ${bookingData.savedPaymentMethodId === m.id ? 'border-[#ee6b20] bg-white shadow-sm' : 'border-gray-200 bg-transparent'}`}>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-[#1e3d5a]">{m.displayLabel || 'GCash'}</span>
+                                  <span className="text-xs text-gray-400 font-mono">{m.mobileNumber}</span>
+                                  {m.isDefault && <span className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-bold">Default</span>}
+                                </div>
+                                {bookingData.savedPaymentMethodId === m.id && <CheckCircle2 className="size-5 text-[#ee6b20]" />}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* E-Wallet Accordion */}
                     <div className={`border-2 rounded-2xl overflow-hidden transition-all ${bookingData.paymentMethod === 'GCash' || bookingData.paymentMethod === 'Maya' ? 'border-[#ee6b20]' : 'border-gray-100'}`}>
                       <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => setBookingData({ ...bookingData, paymentMethod: 'GCash' })}>

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { 
   Bell, MapPin, Search, ChevronRight, CheckCircle2, Edit, Trash2, Car, Bike, Truck, 
-  Map, Info, Clock, Plus, LogOut, LayoutGrid, X, Settings
+  Map, Info, Clock, Plus, LogOut, LayoutGrid, X, Settings, HelpCircle
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -241,13 +241,13 @@ export default function CustomerHomePage() {
               <p className="text-sm text-gray-500 font-medium mt-1">View active bookings</p>
             </div>
 
-            {/* Nav Card 3 */}
-            <div className="group mt-20 bg-white rounded-[2rem] pt-16 pb-8 px-6 shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-2 hover:border-yellow-100 transition-all duration-300 cursor-pointer flex flex-col items-center text-center relative">
+            {/* Nav Card 3 — FAQ (SCRUM-999) */}
+            <div onClick={() => router.push('/help')} className="group mt-20 bg-white rounded-[2rem] pt-16 pb-8 px-6 shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-2 hover:border-yellow-100 transition-all duration-300 cursor-pointer flex flex-col items-center text-center relative">
               <div className="absolute -top-24 left-1/2 -translate-x-1/2 h-44 w-44 transition-transform duration-500 group-hover:-translate-y-4 group-hover:scale-110 animate-in zoom-in delay-150">
-                <Image src="/assets/49e0d16aae0cfb13df1b2acdc4fbd4b2ab68795e.png" alt="Rate & Review mascot" fill className="object-contain drop-shadow-2xl" unoptimized />
+                <Image src="/assets/49e0d16aae0cfb13df1b2acdc4fbd4b2ab68795e.png" alt="Help & FAQ mascot" fill className="object-contain drop-shadow-2xl" unoptimized />
               </div>
-              <h3 className="text-lg font-black text-[#1e3d5a]">Rate & Review</h3>
-              <p className="text-sm text-gray-500 font-medium mt-1">Give feedback</p>
+              <h3 className="text-lg font-black text-[#1e3d5a]">Help &amp; FAQ</h3>
+              <p className="text-sm text-gray-500 font-medium mt-1">Get instant answers</p>
             </div>
           </div>
         </section>
@@ -317,6 +317,10 @@ export default function CustomerHomePage() {
               <li className="flex items-start gap-4">
                 <div className="bg-green-50 text-green-600 p-2.5 rounded-xl shrink-0"><CheckCircle2 className="size-5" /></div>
                 <p><strong>Check-In dynamically:</strong> Present your digital ticket reference to the station teller when you arrive.</p>
+              </li>
+              <li className="flex items-start gap-4 cursor-pointer hover:bg-gray-50 p-2 -m-2 rounded-2xl transition-colors" onClick={() => router.push('/help')}>
+                <div className="bg-purple-50 text-purple-600 p-2.5 rounded-xl shrink-0"><HelpCircle className="size-5" /></div>
+                <p><strong>Need more help?</strong> Visit our <span className="text-purple-600 font-bold underline">Help & FAQ Center</span> for detailed answers to common questions.</p>
               </li>
             </ul>
             <button onClick={() => setShowGuide(false)} className="w-full mt-8 bg-[#1e3d5a] hover:bg-[#2a5373] text-white font-bold py-4 rounded-2xl transition-colors shadow-lg">

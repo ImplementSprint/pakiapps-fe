@@ -1,21 +1,37 @@
+'use strict';
 /**
  * uploadController.js
+ * ===================
+ * Handles file uploads via Supabase Storage.
  *
- * Handles:
- *   POST /api/uploads/avatar     — customer profile picture
- *   POST /api/uploads/vehicle/:vehicleId/or  — Official Receipt doc
- *   POST /api/uploads/vehicle/:vehicleId/cr  — Certificate of Registration doc
- *   DELETE /api/uploads/:id      — delete an upload record + disk file
+ * Routes:
+ *   POST   /api/uploads/avatar                — customer profile picture
+ *   POST   /api/uploads/vehicle/:vehicleId/or — Official Receipt document
+ *   POST   /api/uploads/vehicle/:vehicleId/cr — Certificate of Registration
+ *   GET    /api/uploads/my                    — list user's upload records
+ *   DELETE /api/uploads/:id                   — delete upload record + Storage file
+ *
+ * All files are stored in Supabase Storage:
+ *   Bucket: process.env.SUPABASE_AVATAR_BUCKET  (default: 'avatars')
+ *   Bucket: process.env.SUPABASE_VEHICLE_BUCKET (default: 'vehicle-docs')
+ *
+ * Storage path pattern:
+ *   avatars:      user-{userId}/{timestamp}-{random}.{ext}
+ *   vehicle-docs: user-{userId}/vehicle-{vehicleId}/{timestamp}-{random}.{ext}
  */
 
 const path = require('path');
-const fs   = require('fs');
 const { User, Vehicle, Upload } = require('../models/index');
+const { uploadFile, deleteFile } = require('../config/supabaseStorage');
 
-// Build a public URL from the filename and sub-folder
-function buildUrl(req, folder, filename) {
-  const base = `${req.protocol}://${req.get('host')}`;
-  return `${base}/uploads/${folder}/${filename}`;
+const AVATAR_BUCKET  = process.env.SUPABASE_AVATAR_BUCKET  || 'avatars';
+const VEHICLE_BUCKET = process.env.SUPABASE_VEHICLE_BUCKET || 'vehicle-docs';
+
+/** Build a unique storage path for the file */
+function storagePath(prefix, originalname) {
+  const ext  = path.extname(originalname).toLowerCase() || '.bin';
+  const name = `${Date.now()}-${Math.round(Math.random() * 1e6)}${ext}`;
+  return `${prefix}/${name}`;
 }
 
 // ── POST /api/uploads/avatar ─────────────────────────────────────────────────
@@ -25,14 +41,17 @@ const uploadAvatar = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
 
-    const url = buildUrl(req, 'avatars', req.file.filename);
+    const filePath = storagePath(`user-${req.user.id}`, req.file.originalname);
 
-    // Persist upload record
+    // Upload buffer directly to Supabase Storage
+    const url = await uploadFile(AVATAR_BUCKET, filePath, req.file.buffer, req.file.mimetype);
+
+    // Persist upload record in DB
     const upload = await Upload.create({
       userId:       req.user.id,
       entityType:   'user_avatar',
       entityId:     req.user.id,
-      filename:     req.file.filename,
+      filename:     filePath,            // storagePath for future deletion
       originalName: req.file.originalname,
       mimeType:     req.file.mimetype,
       size:         req.file.size,
@@ -49,7 +68,7 @@ const uploadAvatar = async (req, res) => {
   }
 };
 
-// ── POST /api/uploads/vehicle/:vehicleId/or ──────────────────────────────────
+// ── POST /api/uploads/vehicle/:vehicleId/or ───────────────────────────────────
 const uploadOrDoc = async (req, res) => {
   try {
     if (!req.file) {
@@ -62,20 +81,20 @@ const uploadOrDoc = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Vehicle not found' });
     }
 
-    const url = buildUrl(req, 'vehicles', req.file.filename);
+    const filePath = storagePath(`user-${req.user.id}/vehicle-${vehicleId}`, req.file.originalname);
+    const url = await uploadFile(VEHICLE_BUCKET, filePath, req.file.buffer, req.file.mimetype);
 
     const upload = await Upload.create({
       userId:       req.user.id,
       entityType:   'vehicle_or',
       entityId:     vehicleId,
-      filename:     req.file.filename,
+      filename:     filePath,
       originalName: req.file.originalname,
       mimeType:     req.file.mimetype,
       size:         req.file.size,
       url,
     });
 
-    // Save the URL on the vehicle row
     await vehicle.update({ orDoc: url });
 
     res.json({ success: true, data: { url, upload: upload.toJSON() } });
@@ -84,7 +103,7 @@ const uploadOrDoc = async (req, res) => {
   }
 };
 
-// ── POST /api/uploads/vehicle/:vehicleId/cr ──────────────────────────────────
+// ── POST /api/uploads/vehicle/:vehicleId/cr ───────────────────────────────────
 const uploadCrDoc = async (req, res) => {
   try {
     if (!req.file) {
@@ -97,13 +116,14 @@ const uploadCrDoc = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Vehicle not found' });
     }
 
-    const url = buildUrl(req, 'vehicles', req.file.filename);
+    const filePath = storagePath(`user-${req.user.id}/vehicle-${vehicleId}`, req.file.originalname);
+    const url = await uploadFile(VEHICLE_BUCKET, filePath, req.file.buffer, req.file.mimetype);
 
     const upload = await Upload.create({
       userId:       req.user.id,
       entityType:   'vehicle_cr',
       entityId:     vehicleId,
-      filename:     req.file.filename,
+      filename:     filePath,
       originalName: req.file.originalname,
       mimeType:     req.file.mimetype,
       size:         req.file.size,
@@ -118,7 +138,7 @@ const uploadCrDoc = async (req, res) => {
   }
 };
 
-// ── DELETE /api/uploads/:id ──────────────────────────────────────────────────
+// ── DELETE /api/uploads/:id ───────────────────────────────────────────────────
 const deleteUpload = async (req, res) => {
   try {
     const record = await Upload.findOne({
@@ -128,10 +148,14 @@ const deleteUpload = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Upload not found' });
     }
 
-    // Delete the physical file
-    const folder = record.entityType === 'user_avatar' ? 'avatars' : 'vehicles';
-    const filePath = path.join(__dirname, '..', 'uploads', folder, record.filename);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    // Determine bucket from entityType and delete from Supabase Storage
+    const bucket = record.entityType === 'user_avatar' ? AVATAR_BUCKET : VEHICLE_BUCKET;
+    try {
+      await deleteFile(bucket, record.filename);
+    } catch (storageErr) {
+      // Log but don't fail — the DB record should still be removed
+      console.warn('[Upload] Storage delete skipped:', storageErr.message);
+    }
 
     await record.destroy();
     res.json({ success: true, message: 'File deleted' });
@@ -140,7 +164,7 @@ const deleteUpload = async (req, res) => {
   }
 };
 
-// ── GET /api/uploads/my ─────────────────────────────────────────────────────
+// ── GET /api/uploads/my ───────────────────────────────────────────────────────
 const getMyUploads = async (req, res) => {
   try {
     const uploads = await Upload.findAll({

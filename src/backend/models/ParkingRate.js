@@ -11,6 +11,7 @@ const ParkingRate = sequelize.define(
   },
   {
     tableName:  'parking_rates',
+    schema: 'parking_lot',
     timestamps: true,
     indexes: [
       // ── Rate lookup by vehicle type ────────────────────────────────────

@@ -33,6 +33,7 @@ const Upload = sequelize.define(
   },
   {
     tableName:  'uploads',
+    schema: 'teller',
     timestamps: true,
     indexes: [
       { name: 'idx_uploads_user',   fields: ['userId'] },

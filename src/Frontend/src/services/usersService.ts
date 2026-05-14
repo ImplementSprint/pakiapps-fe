@@ -61,4 +61,26 @@ export const usersService = {
     const res = await api.get('/users');
     return res.data ?? [];
   },
+
+  /**
+   * Upload a profile picture to Supabase Storage.
+   * @param file - The File object from an <input type="file"> element.
+   * @returns    - { url: string } — the public Supabase Storage URL.
+   */
+  async uploadProfilePicture(file: File): Promise<{ url: string }> {
+    const form = new FormData();
+    form.append('avatar', file);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/uploads/avatar`,
+      {
+        method:  'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body:    form,
+      }
+    );
+    const json = await response.json();
+    if (!json.success) throw new Error(json.message || 'Upload failed');
+    return { url: json.data.url };
+  },
 };

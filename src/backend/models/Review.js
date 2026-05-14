@@ -26,6 +26,7 @@ const Review = sequelize.define(
   },
   {
     tableName:  'reviews',
+    schema: 'partner',
     timestamps: true,
     indexes: [
       { name: 'idx_reviews_location', fields: ['locationId'] },
