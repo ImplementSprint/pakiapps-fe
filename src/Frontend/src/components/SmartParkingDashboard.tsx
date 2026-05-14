@@ -477,12 +477,11 @@ export function SmartParkingDashboard() {
   const recommendedMs = useRef(45_000);
 
   // Per-second tick to refresh countdowns without API call
-  const tickCounter = useRef(0);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [tickCount, setTickCount] = useState(0);
   const startTicker = useCallback(() => {
     tickRef.current && clearInterval(tickRef.current);
-    tickRef.current = setInterval(() => { tickCounter.current += 1; setTickCount(n => n + 1); }, 60_000);
+    tickRef.current = setInterval(() => setTickCount(n => n + 1), 60_000);
   }, []);
 
   // Walk-in
@@ -586,8 +585,8 @@ export function SmartParkingDashboard() {
   const currentRows = [...new Set(currentFloorSlots.map(g => g.row))].sort((a, b) => a.localeCompare(b));
   const selectedLocation = locations.find(l => l._id === selectedLocationId);
 
-  // Per-slot live timing (recomputed each render tick)
-  const getTiming = (g: GridSlot) => recomputeTiming(g.dbSlot, today);
+  // Per-slot live timing — tickCount read to force re-evaluation on each timer tick
+  const getTiming = (g: GridSlot) => { void tickCount; return recomputeTiming(g.dbSlot, today); };
 
   // Stats (respect no-show as "available" for operator clarity)
   const stats = {
@@ -745,6 +744,7 @@ export function SmartParkingDashboard() {
   };
 
   const isNoSlotsConfigured = !isLoading && dashboardSlots.length === 0;
+  const handleSlotSelect = useCallback((slot: GridSlot) => { setSelectedSlot(slot); setShowModal(true); }, []);
 
   const renderParkingGrid = (): JSX.Element | null => {
     if (isLoading) {
@@ -793,7 +793,7 @@ export function SmartParkingDashboard() {
                     <SlotButton
                       key={g.dbSlot._id}
                       g={g} visual={visual} vc={vc} timing={timing} walkIn={walkIn}
-                      onSelect={slot => { setSelectedSlot(slot); setShowModal(true); }}
+                      onSelect={handleSlotSelect}
                     />
                   );
                 })}
@@ -957,13 +957,19 @@ export function SmartParkingDashboard() {
 
       {/* Pricing Editor Modal */}
       {showPricingModal && (
-        <dialog
-          open
-          aria-label="Overtime Pricing"
-          className="fixed inset-0 m-0 w-full h-full max-w-none max-h-none bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm border-0"
+        <div
+          role="presentation"
+          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
           onClick={() => setShowPricingModal(false)}
           onKeyDown={e => { if (e.key === 'Escape') setShowPricingModal(false); }}>
-          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8" onClick={e => e.stopPropagation()}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Overtime Pricing"
+            tabIndex={0}
+            className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8"
+            onClick={e => e.stopPropagation()}
+            onKeyDown={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-xl font-black text-[#1e3d5a]">Overtime Pricing</h3>
@@ -1050,21 +1056,27 @@ export function SmartParkingDashboard() {
               </Button>
             </div>
           </div>
-        </dialog>
+        </div>
       )}
 
       {/* Slot detail modal */}
       {showModal && selectedSlot && (
-        <dialog
-          open
-          aria-label="Slot Details"
-          className="fixed inset-0 m-0 w-full h-full max-w-none max-h-none bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm border-0"
+        <div
+          role="presentation"
+          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
           onClick={() => setShowModal(false)}
           onKeyDown={e => { if (e.key === 'Escape') setShowModal(false); }}>
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Slot Details"
+            tabIndex={0}
+            className="bg-white rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+            onKeyDown={e => e.stopPropagation()}>
             <div className="p-6 relative">{renderModalContent()}</div>
           </div>
-        </dialog>
+        </div>
       )}
     </div>
   );
