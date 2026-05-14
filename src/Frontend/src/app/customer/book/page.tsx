@@ -3,9 +3,9 @@ import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import {
-  ArrowLeft, Clock, CheckCircle, MapPin,
+  ArrowLeft, Clock, MapPin,
   Car, Loader2, Sparkles, CalendarDays, Download, User, Share,
-  CreditCard, Smartphone, Building, ChevronDown, CheckCircle2, ShieldCheck, AlertCircle
+  CreditCard, Smartphone, ChevronDown, CheckCircle2, ShieldCheck, AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,7 +65,6 @@ function BookParkingContent() {
   }, [queryVehicleId]);
 
   const [currentStep, setCurrentStep] = useState<'timeslot' | 'review' | 'payment' | 'receipt'>('timeslot');
-  const [showSuccessModal, setShowSuccessModal] = useState(false); // Legacy, will ignore or remove
   const [isConfirming, setIsConfirming] = useState(false);
 
   const [showFloorModal, setShowFloorModal] = useState(false);
@@ -82,10 +81,8 @@ function BookParkingContent() {
   });
 
   const [savedMethods, setSavedMethods] = useState<PaymentMethod[]>([]);
-  const [isLoadingMethods, setIsLoadingMethods] = useState(false);
 
   useEffect(() => {
-    setIsLoadingMethods(true);
     paymentMethodService.getAll().then(methods => {
       setSavedMethods(methods);
       const def = methods.find((m: any) => m.isDefault);
@@ -96,7 +93,7 @@ function BookParkingContent() {
           savedPaymentMethodId: def.id
         }));
       }
-    }).finally(() => setIsLoadingMethods(false));
+    });
   }, []);
 
   const [cardDetails, setCardDetails] = useState({ number: '', name: '', expiry: '', cvv: '' });
@@ -112,8 +109,8 @@ function BookParkingContent() {
     if (/^3[47]/.test(n)) return 'Amex';
     if (/^6(?:011|5)/.test(n) || n.startsWith('6')) return 'Discover';
     if (/^3(?:0[0-5]|[68])/.test(n)) return 'Diners Club';
-    if (/^35/.test(n)) return 'JCB';
-    if (/^62/.test(n) || /^81/.test(n)) return 'UnionPay';
+    if (n.startsWith('35')) return 'JCB';
+    if (n.startsWith('62') || n.startsWith('81')) return 'UnionPay';
     return null;
   };
 
@@ -124,8 +121,8 @@ function BookParkingContent() {
     if (parts.length === 1) return name.substring(0, 18);
     const lastName = parts.pop();
     let initials = '';
-    for (let i = 0; i < parts.length; i++) {
-        const letter = parts[i].replace(/[^a-zA-Z]/g, '').charAt(0);
+    for (const part of parts) {
+        const letter = part.replace(/[^a-zA-Z]/g, '').charAt(0);
         if (letter) initials += letter;
     }
     return `${initials} ${lastName}`.substring(0, 18);
@@ -161,7 +158,7 @@ function BookParkingContent() {
 
   const handleFloorConfirm = (floor: number | null) => {
     let assigned: ParkingSlot | null = allSlots.filter(s => s.status === 'available').find(s => floor === null || s.floor === floor) || null;
-    if (!assigned) assigned = allSlots.find(s => s.status === 'available') || null;
+    assigned ??= allSlots.find(s => s.status === 'available') || null;
     setBookingData(prev => ({ ...prev, selectedParkingSlot: assigned }));
     setShowFloorModal(false);
     setCurrentStep('review');
@@ -180,7 +177,7 @@ function BookParkingContent() {
       let sum = 0;
       let shouldDouble = false;
       for (let i = n.length - 1; i >= 0; i--) {
-        let digit = parseInt(n.charAt(i), 10);
+        let digit = Number.parseInt(n.charAt(i), 10);
         if (shouldDouble) {
           if ((digit *= 2) > 9) digit -= 9;
         }
@@ -196,8 +193,8 @@ function BookParkingContent() {
       
       const [mm, yy] = cardDetails.expiry.split('/');
       if (!mm || !yy || mm.length !== 2 || yy.length !== 2) { setCardErrorField('expiry'); return setCardError('Invalid expiry form (MM/YY).'); }
-      const expMonth = parseInt(mm, 10);
-      const expYear = parseInt('20' + yy, 10);
+      const expMonth = Number.parseInt(mm, 10);
+      const expYear = Number.parseInt('20' + yy, 10);
       const now = new Date();
       if (expMonth < 1 || expMonth > 12) { setCardErrorField('expiry'); return setCardError('Invalid expiry month (1-12).'); }
       if (expYear < now.getFullYear() || (expYear === now.getFullYear() && expMonth < now.getMonth() + 1)) { setCardErrorField('expiry'); return setCardError('This card has already expired.'); }
@@ -227,6 +224,29 @@ function BookParkingContent() {
     }
   };
 
+  const isTimeslot = currentStep === 'timeslot';
+  const isReview = currentStep === 'review';
+  const isPayment = currentStep === 'payment';
+  const isReceipt = currentStep === 'receipt';
+
+  const step1Style = isTimeslot ? 'bg-[#ee6b20] text-white shadow-md shadow-orange-200 font-bold scale-110' : 'bg-green-500 text-white';
+  
+  let step2Style = 'bg-gray-100 text-gray-400';
+  if (isReview) step2Style = 'bg-[#ee6b20] text-white shadow-md shadow-orange-200 font-bold scale-110';
+  else if (isPayment || isReceipt) step2Style = 'bg-green-500 text-white';
+
+  let step2Text = 'text-gray-300';
+  if (isReview) step2Text = 'text-[#1e3d5a]';
+  else if (isPayment || isReceipt) step2Text = 'text-green-600';
+
+  let step3Style = 'bg-gray-100 text-gray-400';
+  if (isPayment) step3Style = 'bg-[#ee6b20] text-white shadow-md shadow-orange-200 font-bold scale-110';
+  else if (isReceipt) step3Style = 'bg-green-500 text-white';
+
+  let step3Text = 'text-gray-300';
+  if (isPayment) step3Text = 'text-[#1e3d5a]';
+  else if (isReceipt) step3Text = 'text-green-600';
+
   return (
     <div className="min-h-screen bg-[#f4f7fa] flex flex-col font-sans">
       <header className="bg-white border-b border-gray-100 sticky top-0 z-50 px-5 h-16 flex justify-between items-center shadow-sm">
@@ -249,7 +269,7 @@ function BookParkingContent() {
           <div className="flex items-center gap-2 sm:gap-4">
                {/* 1 SCHEDULE */}
                <div className="flex items-center gap-2 sm:gap-3">
-                 <div className={`size-8 sm:size-10 rounded-full flex items-center justify-center font-black transition-all duration-500 ${currentStep==='timeslot' ? 'bg-[#ee6b20] text-white shadow-md shadow-orange-200 font-bold scale-110' : 'bg-green-500 text-white'}`}><CheckCircle2 className="size-5" /></div>
+                 <div className={`size-8 sm:size-10 rounded-full flex items-center justify-center font-black transition-all duration-500 ${step1Style}`}><CheckCircle2 className="size-5" /></div>
                  <span className={`font-black tracking-widest text-xs sm:text-sm uppercase transition-colors duration-500 text-green-600`}>Schedule</span>
                </div>
                <div className="w-8 sm:w-16 h-[3px] bg-gray-200 mx-1 rounded-full relative overflow-hidden">
@@ -258,17 +278,17 @@ function BookParkingContent() {
                
                {/* 2 CONFIRM */}
                <div className="flex items-center gap-2 sm:gap-3">
-                 <div className={`size-8 sm:size-10 rounded-full flex items-center justify-center font-black transition-all duration-500 ${currentStep==='review' ? 'bg-[#ee6b20] text-white shadow-md shadow-orange-200 font-bold scale-110' : currentStep==='payment' || currentStep==='receipt' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>{currentStep==='payment' || currentStep==='receipt' ? <CheckCircle2 className="size-5" /> : '2'}</div>
-                 <span className={`font-black tracking-widest text-xs sm:text-sm uppercase transition-colors duration-500 ${currentStep==='review' ? 'text-[#1e3d5a]' : currentStep==='payment' || currentStep==='receipt' ? 'text-green-600' : 'text-gray-300'}`}>Confirm</span>
+                 <div className={`size-8 sm:size-10 rounded-full flex items-center justify-center font-black transition-all duration-500 ${step2Style}`}>{isPayment || isReceipt ? <CheckCircle2 className="size-5" /> : '2'}</div>
+                 <span className={`font-black tracking-widest text-xs sm:text-sm uppercase transition-colors duration-500 ${step2Text}`}>Confirm</span>
                </div>
                <div className="w-8 sm:w-16 h-[3px] bg-gray-200 mx-1 rounded-full relative overflow-hidden">
-                  <div className={`absolute left-0 top-0 h-full bg-[#ee6b20] transition-all duration-700 ${currentStep==='payment' || currentStep==='receipt' ? 'w-full' : 'w-0'}`} />
+                  <div className={`absolute left-0 top-0 h-full bg-[#ee6b20] transition-all duration-700 ${isPayment || isReceipt ? 'w-full' : 'w-0'}`} />
                </div>
                
                {/* 3 PAYMENT */}
                <div className="flex items-center gap-2 sm:gap-3">
-                 <div className={`size-8 sm:size-10 rounded-full flex items-center justify-center font-black transition-all duration-500 ${currentStep==='payment' ? 'bg-[#ee6b20] text-white shadow-md shadow-orange-200 font-bold scale-110' : currentStep==='receipt' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>{currentStep==='receipt' ? <CheckCircle2 className="size-5" /> : '3'}</div>
-                 <span className={`font-black tracking-widest text-xs sm:text-sm uppercase transition-colors duration-500 ${currentStep==='payment' ? 'text-[#1e3d5a]' : currentStep==='receipt' ? 'text-green-600' : 'text-gray-300'}`}>Payment</span>
+                 <div className={`size-8 sm:size-10 rounded-full flex items-center justify-center font-black transition-all duration-500 ${step3Style}`}>{isReceipt ? <CheckCircle2 className="size-5" /> : '3'}</div>
+                 <span className={`font-black tracking-widest text-xs sm:text-sm uppercase transition-colors duration-500 ${step3Text}`}>Payment</span>
                </div>
           </div>
         </div>
@@ -283,9 +303,10 @@ function BookParkingContent() {
             <form onSubmit={e => { e.preventDefault(); handleOpenFloorModal(); }} className="space-y-8">
               {/* Date Selection */}
               <div className="space-y-3">
-                <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest pl-1">Target Date</label>
+                <label htmlFor="targetDate" className="text-[11px] font-black text-gray-400 uppercase tracking-widest pl-1">Target Date</label>
                 <div className="relative">
                   <Input 
+                    id="targetDate"
                     type="date" 
                     value={bookingData.date} 
                     min={todayStr()} 
@@ -495,7 +516,7 @@ function BookParkingContent() {
           </div>
         )}
 
-        {currentStep === 'payment' && !showSuccessModal && (
+        {currentStep === 'payment' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 w-full max-w-5xl mx-auto mt-4 px-4 sm:px-0">
             <div className="text-center mb-10">
               <h2 className="text-4xl font-black text-[#1e3d5a] tracking-tight">Checkout securely</h2>
@@ -545,7 +566,7 @@ function BookParkingContent() {
                     {/* Saved Payment Methods (Auto-Charge SCRUM-1018) */}
                     {savedMethods.length > 0 && (
                       <div className={`border-2 rounded-2xl overflow-hidden transition-all ${bookingData.paymentMethod === 'gcash_linked' ? 'border-[#ee6b20]' : 'border-gray-100'}`}>
-                        <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => setBookingData({ ...bookingData, paymentMethod: 'gcash_linked', savedPaymentMethodId: savedMethods[0].id })}>
+                        <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') setBookingData({ ...bookingData, paymentMethod: 'gcash_linked', savedPaymentMethodId: savedMethods[0].id }) }} className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => setBookingData({ ...bookingData, paymentMethod: 'gcash_linked', savedPaymentMethodId: savedMethods[0].id })}>
                           <div className="flex items-center gap-3">
                             <div className="size-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">💙</div>
                             <div>
@@ -575,7 +596,7 @@ function BookParkingContent() {
 
                     {/* E-Wallet Accordion */}
                     <div className={`border-2 rounded-2xl overflow-hidden transition-all ${bookingData.paymentMethod === 'GCash' || bookingData.paymentMethod === 'Maya' ? 'border-[#ee6b20]' : 'border-gray-100'}`}>
-                      <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => setBookingData({ ...bookingData, paymentMethod: 'GCash' })}>
+                      <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') setBookingData({ ...bookingData, paymentMethod: 'GCash' }) }} className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => setBookingData({ ...bookingData, paymentMethod: 'GCash' })}>
                         <div className="flex items-center gap-3">
                           <div className="size-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center"><Smartphone className="size-5" /></div>
                           <div>
@@ -603,7 +624,7 @@ function BookParkingContent() {
 
                     {/* Credit Card */}
                     <div className={`border-2 rounded-2xl overflow-hidden transition-all ${bookingData.paymentMethod === 'Credit/Debit Card' ? 'border-[#ee6b20]' : 'border-gray-100 hover:border-gray-200'}`}>
-                      <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => setBookingData({ ...bookingData, paymentMethod: 'Credit/Debit Card' })}>
+                      <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') setBookingData({ ...bookingData, paymentMethod: 'Credit/Debit Card' }) }} className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => setBookingData({ ...bookingData, paymentMethod: 'Credit/Debit Card' })}>
                         <div className="flex items-center gap-3">
                           <div className="size-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center"><CreditCard className="size-5" /></div>
                           <div>
@@ -697,12 +718,13 @@ function BookParkingContent() {
                           <div className="space-y-4 animate-in slide-in-from-bottom-2">
                             <div>
                               <div className="flex justify-between items-end mb-1.5">
-                                <label className="text-[11px] font-black uppercase tracking-widest text-[#1e3d5a] pl-1">Card Number</label>
+                                <label htmlFor="cardNumber" className="text-[11px] font-black uppercase tracking-widest text-[#1e3d5a] pl-1">Card Number</label>
                                 {getCardType(cardDetails.number) && <span className="text-[10px] font-black uppercase text-[#ee6b20] bg-orange-100 px-2 py-0.5 rounded-full">{getCardType(cardDetails.number)}</span>}
                               </div>
                               <div className="relative">
                                 <CreditCard className={`absolute left-4 top-1/2 -translate-y-1/2 size-5 transition-colors ${focusedField === 'number' ? 'text-[#ee6b20]' : 'text-gray-400'}`} />
                                 <Input 
+                                  id="cardNumber"
                                   value={cardDetails.number}
                                   onFocus={() => setFocusedField('number')}
                                   onBlur={() => setFocusedField(null)}
@@ -721,8 +743,9 @@ function BookParkingContent() {
                             </div>
 
                             <div>
-                              <label className="text-[11px] font-black uppercase tracking-widest text-[#1e3d5a] pl-1 block mb-1.5">Card Holder</label>
+                              <label htmlFor="cardHolder" className="text-[11px] font-black uppercase tracking-widest text-[#1e3d5a] pl-1 block mb-1.5">Card Holder</label>
                               <Input 
+                                id="cardHolder"
                                 value={cardDetails.name}
                                 onFocus={() => setFocusedField('name')}
                                 onBlur={() => setFocusedField(null)}
@@ -738,8 +761,9 @@ function BookParkingContent() {
 
                             <div className="grid grid-cols-2 gap-4">
                               <div>
-                                <label className="text-[11px] font-black uppercase tracking-widest text-[#1e3d5a] pl-1 block mb-1.5">Expiry Date</label>
+                                <label htmlFor="cardExpiry" className="text-[11px] font-black uppercase tracking-widest text-[#1e3d5a] pl-1 block mb-1.5">Expiry Date</label>
                                 <Input 
+                                  id="cardExpiry"
                                   value={cardDetails.expiry}
                                   onFocus={() => setFocusedField('expiry')}
                                   onBlur={() => setFocusedField(null)}
@@ -756,8 +780,9 @@ function BookParkingContent() {
                                 />
                               </div>
                               <div>
-                                <label className="text-[11px] font-black uppercase tracking-widest text-[#1e3d5a] pl-1 block mb-1.5">CVV / CVC</label>
+                                <label htmlFor="cardCvv" className="text-[11px] font-black uppercase tracking-widest text-[#1e3d5a] pl-1 block mb-1.5">CVV / CVC</label>
                                 <Input 
+                                  id="cardCvv"
                                   type="password"
                                   value={cardDetails.cvv}
                                   onFocus={() => setFocusedField('cvv')}
@@ -879,7 +904,7 @@ function BookParkingContent() {
                     <Download className="size-4" /> Save Image
                  </Button>
               </div>
-              <Button onClick={() => window.print()} className="w-full bg-[#1e3d5a] h-14 rounded-2xl font-bold gap-2 hover:bg-transparent hover:text-[#1e3d5a] border border-[#1e3d5a] transition-colors shadow-xl">
+              <Button onClick={() => globalThis.print()} className="w-full bg-[#1e3d5a] h-14 rounded-2xl font-bold gap-2 hover:bg-transparent hover:text-[#1e3d5a] border border-[#1e3d5a] transition-colors shadow-xl">
                 <Download className="size-4" /> Download/Print E-Pass
               </Button>
               <Button onClick={() => router.push('/customer/home')} variant="outline" className="w-full h-14 rounded-2xl font-bold border-gray-200 text-gray-600 bg-white shadow-sm hover:border-[#1e3d5a] transition-colors">
