@@ -402,6 +402,45 @@ function ActivePanel({ isOver, booking, timing, setShowModal, handleCheckOut, ac
   );
 }
 
+// ─── Slot button (extracted to avoid 4-level nesting warning) ────────────────
+interface SlotButtonProps {
+  g: GridSlot;
+  visual: string;
+  vc: ReturnType<typeof getVisualConfig>;
+  timing: BookingTiming | null;
+  walkIn: any;
+  onSelect: (g: GridSlot) => void;
+}
+function SlotButton({ g, visual, vc, timing, walkIn, onSelect }: Readonly<SlotButtonProps>) {
+  const SlotIcon = vc.icon;
+  const cursorCls = visual === 'maintenance' ? 'cursor-not-allowed' : 'cursor-pointer hover:scale-105';
+  return (
+    <button
+      onClick={() => { if (visual !== 'maintenance') onSelect(g); }}
+      title={`${g.dbSlot.label} · ${g.category} · ${visual}`}
+      className={`relative group w-[4.25rem] h-[4.25rem] rounded-xl border-2 transition-all ${vc.card} ${cursorCls}`}>
+      <div className="flex flex-col items-center justify-center h-full gap-0.5 px-1">
+        <SlotIcon className={`size-3.5 ${vc.iconColor}`} />
+        <span className="text-[10px] font-black text-[#1e3d5a] leading-none">{g.number}</span>
+        {visual === 'available' ? null : <CountdownPill timing={timing} />}
+      </div>
+      <div className={`absolute top-1 left-1 size-2 rounded-full ${categoryStyles[g.category].bg}`} title={g.category} />
+      {g.dbSlot.booking && !walkIn && (
+        <div className="absolute -top-1.5 -right-1.5 size-3.5 bg-[#1e3d5a] rounded-full flex items-center justify-center">
+          <CheckCircle className="size-2.5 text-white" />
+        </div>
+      )}
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-2 bg-[#1e3d5a] text-white text-[10px] rounded-xl shadow-xl whitespace-nowrap z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
+        <p className="font-bold">{g.dbSlot.label} · {g.category}</p>
+        <p className="text-white/60 capitalize">{visual.replace('_',' ')}</p>
+        {g.dbSlot.booking?.vehicle?.plateNumber && <p className="text-[#ee6b20] font-bold mt-0.5">{g.dbSlot.booking.vehicle.plateNumber}</p>}
+        {timing?.isInGracePeriod && <p className="text-orange-300">Grace: {timing.gracePeriodMinLeft}m left</p>}
+        {timing?.isOverstay && <p className="text-rose-300">Overstay: +{timing.overstayMinutes}m</p>}
+      </div>
+    </button>
+  );
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Main component
 // ────────────────────────────────────────────────────────────────────────────
@@ -438,10 +477,12 @@ export function SmartParkingDashboard() {
   const recommendedMs = useRef(45_000);
 
   // Per-second tick to refresh countdowns without API call
-  const [_tick, setTick] = useState<number>(0);
+  const tickCounter = useRef(0);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [tickCount, setTickCount] = useState(0);
   const startTicker = useCallback(() => {
     tickRef.current && clearInterval(tickRef.current);
-    tickRef.current = setInterval(() => setTick(t => t + 1), 60_000); // once per minute is fine for minute-level display
+    tickRef.current = setInterval(() => { tickCounter.current += 1; setTickCount(n => n + 1); }, 60_000);
   }, []);
 
   // Walk-in
@@ -744,36 +785,16 @@ export function SmartParkingDashboard() {
               <div className="w-7 h-7 flex items-center justify-center font-bold text-[#1e3d5a] bg-blue-50 rounded-lg text-xs shrink-0">{row}</div>
               <div className="flex gap-2 flex-wrap">
                 {rowSlots.map(g => {
-                  const timing   = getTiming(g);
-                  const walkIn   = walkIns[slotKey(g)];
-                  const visual   = resolveVisualState(g.dbSlot, timing, walkIn);
-                  const vc       = getVisualConfig(visual);
-                  const SlotIcon = vc.icon;
-                  const cursorCls = visual === 'maintenance' ? 'cursor-not-allowed' : 'cursor-pointer hover:scale-105';
+                  const timing = getTiming(g);
+                  const walkIn = walkIns[slotKey(g)];
+                  const visual = resolveVisualState(g.dbSlot, timing, walkIn);
+                  const vc     = getVisualConfig(visual);
                   return (
-                    <button key={g.dbSlot._id}
-                      onClick={() => { if (visual !== 'maintenance') { setSelectedSlot(g); setShowModal(true); } }}
-                      title={`${g.dbSlot.label} · ${g.category} · ${visual}`}
-                      className={`relative group w-[4.25rem] h-[4.25rem] rounded-xl border-2 transition-all ${vc.card} ${cursorCls}`}>
-                      <div className="flex flex-col items-center justify-center h-full gap-0.5 px-1">
-                        <SlotIcon className={`size-3.5 ${vc.iconColor}`} />
-                        <span className="text-[10px] font-black text-[#1e3d5a] leading-none">{g.number}</span>
-                        {visual === 'available' ? null : <CountdownPill timing={timing} />}
-                      </div>
-                      <div className={`absolute top-1 left-1 size-2 rounded-full ${categoryStyles[g.category].bg}`} title={g.category} />
-                      {g.dbSlot.booking && !walkIn && (
-                        <div className="absolute -top-1.5 -right-1.5 size-3.5 bg-[#1e3d5a] rounded-full flex items-center justify-center">
-                          <CheckCircle className="size-2.5 text-white" />
-                        </div>
-                      )}
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-2 bg-[#1e3d5a] text-white text-[10px] rounded-xl shadow-xl whitespace-nowrap z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
-                        <p className="font-bold">{g.dbSlot.label} · {g.category}</p>
-                        <p className="text-white/60 capitalize">{visual.replace('_',' ')}</p>
-                        {g.dbSlot.booking?.vehicle?.plateNumber && <p className="text-[#ee6b20] font-bold mt-0.5">{g.dbSlot.booking.vehicle.plateNumber}</p>}
-                        {timing?.isInGracePeriod && <p className="text-orange-300">Grace: {timing.gracePeriodMinLeft}m left</p>}
-                        {timing?.isOverstay && <p className="text-rose-300">Overstay: +{timing.overstayMinutes}m</p>}
-                      </div>
-                    </button>
+                    <SlotButton
+                      key={g.dbSlot._id}
+                      g={g} visual={visual} vc={vc} timing={timing} walkIn={walkIn}
+                      onSelect={slot => { setSelectedSlot(slot); setShowModal(true); }}
+                    />
                   );
                 })}
               </div>
@@ -942,7 +963,7 @@ export function SmartParkingDashboard() {
           className="fixed inset-0 m-0 w-full h-full max-w-none max-h-none bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm border-0"
           onClick={() => setShowPricingModal(false)}
           onKeyDown={e => { if (e.key === 'Escape') setShowPricingModal(false); }}>
-          <div role="document" tabIndex={-1} className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
+          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-xl font-black text-[#1e3d5a]">Overtime Pricing</h3>
@@ -1040,7 +1061,7 @@ export function SmartParkingDashboard() {
           className="fixed inset-0 m-0 w-full h-full max-w-none max-h-none bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm border-0"
           onClick={() => setShowModal(false)}
           onKeyDown={e => { if (e.key === 'Escape') setShowModal(false); }}>
-          <div role="document" tabIndex={-1} className="bg-white rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-6 relative">{renderModalContent()}</div>
           </div>
         </dialog>
