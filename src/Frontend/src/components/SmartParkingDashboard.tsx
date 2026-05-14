@@ -89,7 +89,7 @@ function nowMinutes() {
 }
 
 function parseTimeSlot(ts: string): { startMin: number; endMin: number } {
-  const m = ts.match(/(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/);
+  const m = /(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/.exec(ts);
   if (!m) return { startMin: 0, endMin: 0 };
   return { startMin: +m[1] * 60 + +m[2], endMin: +m[3] * 60 + +m[4] };
 }
@@ -99,6 +99,16 @@ function minToHHMM(min: number): string {
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
 }
 
+function getTimingState(status: string, isOverstay: boolean, isNoShow: boolean, isInGracePeriod: boolean, isArrivingSoon: boolean): BookingTiming['timingState'] {
+  if (status === 'active') return isOverstay ? 'overstay' : 'occupied';
+  if (status === 'upcoming') {
+    if (isNoShow) return 'no_show';
+    if (isInGracePeriod) return 'in_grace_period';
+    if (isArrivingSoon) return 'arriving_soon';
+  }
+  return 'reserved';
+}
+
 /** Recompute timing based on current local time (keeps countdowns live between polls) */
 function recomputeTiming(slot: DashboardSlot, today: string): BookingTiming | null {
   if (!slot.booking) return null;
@@ -106,7 +116,7 @@ function recomputeTiming(slot: DashboardSlot, today: string): BookingTiming | nu
   if (!timeSlot) return t ?? null;
   const { startMin, endMin } = parseTimeSlot(timeSlot);
   const now = nowMinutes();
-  const isToday = (slot.booking as any).date === today || !!t?.isToday;
+  const isToday = slot.booking.date === today || !!t?.isToday;
   const minutesUntilStart = startMin - now;
   const minutesPastEnd    = now - endMin;
   const graceExpiry       = startMin + GRACE_PERIOD_MIN;
@@ -116,14 +126,7 @@ function recomputeTiming(slot: DashboardSlot, today: string): BookingTiming | nu
   const isNoShow        = isToday && status === 'upcoming' && now > graceExpiry;
   const isOverstay      = isToday && status === 'active'   && minutesPastEnd > 0;
 
-  let timingState: BookingTiming['timingState'] = 'reserved';
-  if (status === 'active')   timingState = isOverstay ? 'overstay' : 'occupied';
-  else if (status === 'upcoming') {
-    if (isNoShow)         timingState = 'no_show';
-    else if (isInGracePeriod) timingState = 'in_grace_period';
-    else if (isArrivingSoon)  timingState = 'arriving_soon';
-    else                      timingState = 'reserved';
-  }
+  const timingState = getTimingState(status, isOverstay, isNoShow, isInGracePeriod, isArrivingSoon);
 
   return {
     minutesUntilStart, minutesPastEnd, isToday,
@@ -165,11 +168,11 @@ function getVisualConfig(visual: string) {
 
 // ─── Slot label parser ────────────────────────────────────────────────────────
 function parseLabel(label: string): { row: string; number: number } {
-  if (label.match(/^F\d+-[A-Z]\d+$/)) {
+  if (/^F\d+-[A-Z]\d+$/.exec(label)) {
     const part = label.split('-')[1];
-    return { row: part.charAt(0), number: parseInt(part.substring(1)) };
+    return { row: part.charAt(0), number: Number.parseInt(part.substring(1), 10) };
   }
-  return { row: label.charAt(0), number: parseInt(label.substring(1)) || 1 };
+  return { row: label.charAt(0), number: Number.parseInt(label.substring(1), 10) || 1 };
 }
 
 interface GridSlot { dbSlot: DashboardSlot; row: string; number: number; category: SlotCategory }
@@ -183,7 +186,7 @@ const saveWalkIns = (date: string, data: Record<string, any>) => {
 };
 
 // ─── Mini countdown display ───────────────────────────────────────────────────
-function CountdownPill({ timing }: { timing: BookingTiming | null }) {
+function CountdownPill({ timing }: Readonly<{ timing: BookingTiming | null }>) {
   if (!timing) return null;
   const { timingState, minutesUntilStart, gracePeriodMinLeft, overstayMinutes } = timing;
 
@@ -222,6 +225,183 @@ function CountdownPill({ timing }: { timing: BookingTiming | null }) {
   return null;
 }
 
+function getOperatingHoursLabel(hours: any): string {
+  if (typeof hours === 'string') return hours;
+  if (hours?.open) return `${hours.open} - ${hours.close}`;
+  return '24/7';
+}
+
+function CategoryBadge({ category, Icon, Cat }: Readonly<{ category: string; Icon: React.ComponentType<any>; Cat: any }>) {
+  return (
+    <span className={`flex items-center gap-1 px-2 py-1 ${Cat.bg} rounded-lg`}>
+      <Icon className="size-3 text-white" /><span className="text-[10px] font-bold text-white uppercase">{category}</span>
+    </span>
+  );
+}
+
+function WalkInReservationPanel({ selectedSlot, walkInForm, setWalkInForm, setShowModal, handleWalkInSave, CatBadge }: any) {
+  return (
+    <div className="space-y-4">
+      <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X className="size-5" /></button>
+      <div className="flex items-center justify-between">
+        <div><h3 className="text-xl font-bold text-[#1e3d5a]">Walk-in Reservation</h3>
+          <p className="text-sm text-gray-400">Slot <span className="font-bold text-[#ee6b20]">{selectedSlot.dbSlot.label}</span> · Floor {selectedSlot.dbSlot.floor}</p></div>
+        {CatBadge}
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-2">
+          <label htmlFor="walkin-driver" className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Driver Name *</label>
+          <Input id="walkin-driver" value={walkInForm.driverName} onChange={e => setWalkInForm({...walkInForm, driverName: e.target.value})} placeholder="Juan Dela Cruz" className="rounded-xl" />
+        </div>
+        <div>
+          <label htmlFor="walkin-plate" className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Plate *</label>
+          <Input id="walkin-plate" value={walkInForm.plateNumber} onChange={e => setWalkInForm({...walkInForm, plateNumber: e.target.value})} placeholder="ABC 123" className="rounded-xl" />
+        </div>
+        <div>
+          <label htmlFor="walkin-color" className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Color</label>
+          <Input id="walkin-color" value={walkInForm.carColor} onChange={e => setWalkInForm({...walkInForm, carColor: e.target.value})} placeholder="White" className="rounded-xl" />
+        </div>
+        <div>
+          <label htmlFor="walkin-type" className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Type</label>
+          <select id="walkin-type" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" value={walkInForm.vehicleType} onChange={e => setWalkInForm({...walkInForm, vehicleType: e.target.value})}>
+            {['Sedan','SUV','Van','Truck','Hatchback','Motorcycle'].map(t => <option key={t}>{t}</option>)}
+          </select>
+        </div>
+        <div className="col-span-2">
+          <label htmlFor="walkin-phone" className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Phone</label>
+          <Input id="walkin-phone" value={walkInForm.phoneNumber} onChange={e => setWalkInForm({...walkInForm, phoneNumber: e.target.value})} placeholder="+63 912 000 0000" className="rounded-xl" />
+        </div>
+        <div className="col-span-2">
+          <label htmlFor="walkin-brand" className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Brand</label>
+          <Input id="walkin-brand" value={walkInForm.brand} onChange={e => setWalkInForm({...walkInForm, brand: e.target.value})} placeholder="Toyota" className="rounded-xl" />
+        </div>
+        <div className="col-span-2">
+          <label htmlFor="walkin-model" className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Model</label>
+          <Input id="walkin-model" value={walkInForm.model} onChange={e => setWalkInForm({...walkInForm, model: e.target.value})} placeholder="Corolla" className="rounded-xl" />
+        </div>
+      </div>
+      <div className="flex gap-3 pt-2 border-t">
+        <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1 rounded-xl">Cancel</Button>
+        <Button onClick={handleWalkInSave} className="flex-1 bg-[#ee6b20] hover:bg-[#d55f1c] rounded-xl"><Plus className="size-4 mr-2" />Reserve</Button>
+      </div>
+    </div>
+  );
+}
+
+function WalkInDetailsPanel({ walkIn, keyStr, setShowModal, handleWalkInCancel, CatBadge }: any) {
+  return (
+    <div className="space-y-4">
+      <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X className="size-5" /></button>
+      <div className="flex items-center justify-between">
+        <h3 className="text-xl font-bold text-[#1e3d5a]">Walk-in Details</h3>{CatBadge}
+      </div>
+      <div className="space-y-2">
+        {[['Driver',walkIn.driverName],['Plate',walkIn.plateNumber],['Color',walkIn.carColor],['Vehicle',walkIn.vehicleType],['Brand',walkIn.brand],['Model',walkIn.model],['Phone',walkIn.phoneNumber]].map(([l,v]) => v ? (
+          <div key={l} className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="text-gray-400">{l}</span><span className="font-bold text-[#1e3d5a]">{v}</span></div>
+        ) : null)}
+      </div>
+      <div className="flex gap-3 pt-2 border-t">
+        <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1 rounded-xl">Close</Button>
+        <Button variant="destructive" onClick={() => handleWalkInCancel(keyStr)} className="flex-1 rounded-xl">Remove Walk-in</Button>
+      </div>
+    </div>
+  );
+}
+
+function NoShowPanel({ booking, timing, setShowModal, handleMarkNoShow, actionLoading }: any) {
+  return (
+    <div className="space-y-4">
+      <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X className="size-5" /></button>
+      <div className="flex items-center justify-between">
+        <div><h3 className="text-xl font-bold text-[#1e3d5a]">No-Show Detected</h3><p className="text-sm font-mono text-gray-400">{booking.reference}</p></div>
+        <span className="px-3 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-bold flex items-center gap-1"><AlertOctagon className="size-3" />NO-SHOW</span>
+      </div>
+      <div className="p-4 bg-gray-50 rounded-2xl border border-dashed border-gray-300 space-y-1">
+        <p className="text-sm text-gray-600">Grace period expired at <span className="font-bold">{timing?.gracePeriodExpiresAt}</span>. Customer did not check in.</p>
+        <p className="text-sm text-gray-500">Booking window: <span className="font-bold">{booking.timeSlot}</span></p>
+        {booking.user && <p className="text-sm text-gray-500">Customer: <span className="font-bold">{booking.user.name}</span></p>}
+        {booking.vehicle && <p className="text-sm text-[#ee6b20] font-bold">{booking.vehicle.plateNumber}</p>}
+      </div>
+      <div className="flex gap-3 pt-2 border-t">
+        <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1 rounded-xl">Close</Button>
+        <Button onClick={() => handleMarkNoShow(booking._id)} disabled={actionLoading} className="flex-1 bg-gray-700 hover:bg-gray-900 rounded-xl text-sm">
+          <AlertOctagon className="size-4 mr-2" />{actionLoading ? 'Processing…' : 'Mark No-Show & Free Slot'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function UpcomingPanel({ isGrace, booking, timing, setShowModal, handleCheckIn, actionLoading }: any) {
+  return (
+    <div className="space-y-4">
+      <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X className="size-5" /></button>
+      <div className="flex items-center justify-between">
+        <div><h3 className="text-xl font-bold text-[#1e3d5a]">{isGrace ? 'Grace Period' : 'Reservation'}</h3>
+          <p className="text-sm font-mono text-[#ee6b20]">{booking.reference}</p></div>
+        <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 ${isGrace ? 'bg-orange-100 text-orange-700 animate-pulse' : 'bg-yellow-100 text-yellow-700'}`}>
+          {isGrace ? <Timer className="size-3" /> : <AlarmClock className="size-3" />}
+          {isGrace ? `Grace: ${timing?.gracePeriodMinLeft}m left` : 'UPCOMING'}
+        </span>
+      </div>
+      {isGrace && (
+        <div className="p-3 bg-orange-50 rounded-xl border border-orange-200">
+          <p className="text-xs font-bold text-orange-800">⚠️ Grace period until {timing?.gracePeriodExpiresAt} — check if customer has arrived</p>
+        </div>
+      )}
+      <div className="space-y-2">
+        {booking.user && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><User className="size-3.5"/>Customer</span><span className="font-bold">{booking.user.name}</span></div>}
+        {booking.vehicle && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Car className="size-3.5"/>Plate</span><span className="font-bold text-[#ee6b20]">{booking.vehicle.plateNumber}</span></div>}
+        {booking.vehicle && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="text-gray-400">Vehicle</span><span className="font-bold">{booking.vehicle.brand} {booking.vehicle.model}</span></div>}
+        <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Clock className="size-3.5"/>Time</span><span className="font-bold">{booking.timeSlot}</span></div>
+        {booking.user?.phone && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Phone className="size-3.5"/>Phone</span><span className="font-bold">{booking.user.phone}</span></div>}
+        <div className="flex justify-between p-3 bg-yellow-50 rounded-xl text-sm border border-yellow-100"><span className="font-medium text-yellow-800">Paid</span><span className="font-bold text-[#1e3d5a]">₱{booking.amount}</span></div>
+      </div>
+      <div className="flex gap-3 pt-2 border-t">
+        <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1 rounded-xl">Close</Button>
+        <Button onClick={() => handleCheckIn(booking._id)} disabled={actionLoading} className="flex-1 bg-[#1e3d5a] hover:bg-[#16304a] rounded-xl">
+          <LogIn className="size-4 mr-2" />{actionLoading ? 'Processing…' : 'Check In'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ActivePanel({ isOver, booking, timing, setShowModal, handleCheckOut, actionLoading }: any) {
+  return (
+    <div className="space-y-4">
+      <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X className="size-5" /></button>
+      <div className="flex items-center justify-between">
+        <div><h3 className="text-xl font-bold text-[#1e3d5a]">{isOver ? 'Overstay Detected' : 'Active Parking'}</h3>
+          <p className="text-sm font-mono text-[#ee6b20]">{booking.reference}</p></div>
+        <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 ${isOver ? 'bg-rose-100 text-rose-700' : 'bg-red-100 text-red-700'}`}>
+          {isOver ? <TrendingUp className="size-3" /> : <Car className="size-3" />}
+          {isOver ? `+${timing?.overstayMinutes}m OVERSTAY` : 'OCCUPIED'}
+        </span>
+      </div>
+      {isOver && (
+        <div className="p-3 bg-rose-50 rounded-xl border border-rose-200">
+          <p className="text-xs font-bold text-rose-800">⚠️ Vehicle exceeded booked time by {timing?.overstayMinutes} minutes. Expected out at {timing?.expectedEndAt}.</p>
+        </div>
+      )}
+      <div className="space-y-2">
+        {booking.user && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><User className="size-3.5"/>Customer</span><span className="font-bold">{booking.user.name}</span></div>}
+        {booking.vehicle && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Car className="size-3.5"/>Plate</span><span className="font-bold text-[#ee6b20]">{booking.vehicle.plateNumber}</span></div>}
+        {booking.vehicle && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="text-gray-400">Vehicle</span><span className="font-bold">{booking.vehicle.brand} {booking.vehicle.model} · {booking.vehicle.color}</span></div>}
+        <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Clock className="size-3.5"/>Booked</span><span className="font-bold">{booking.timeSlot}</span></div>
+        {booking.user?.phone && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Phone className="size-3.5"/>Phone</span><span className="font-bold">{booking.user.phone}</span></div>}
+        <div className="flex justify-between p-3 bg-[#1e3d5a]/5 rounded-xl text-sm border border-[#1e3d5a]/10"><span className="flex items-center gap-2 text-[#1e3d5a] font-medium"><CreditCard className="size-3.5"/>Paid</span><span className="font-bold text-[#1e3d5a]">₱{booking.amount}</span></div>
+      </div>
+      <div className="flex gap-3 pt-2 border-t">
+        <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1 rounded-xl">Close</Button>
+        <Button onClick={() => handleCheckOut(booking._id)} disabled={actionLoading} className={`flex-1 rounded-xl ${isOver ? 'bg-rose-600 hover:bg-rose-700' : 'bg-[#ee6b20] hover:bg-[#d55f1c]'}`}>
+          <LogOutIcon className="size-4 mr-2" />{actionLoading ? 'Processing…' : 'Check Out'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Main component
 // ────────────────────────────────────────────────────────────────────────────
@@ -251,7 +431,6 @@ export function SmartParkingDashboard() {
   const [isLive, setIsLive] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [serverTime, setServerTime] = useState<string>('');
 
   // Adaptive poll interval (server hint)
   const pollRef       = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -259,7 +438,7 @@ export function SmartParkingDashboard() {
   const recommendedMs = useRef(45_000);
 
   // Per-second tick to refresh countdowns without API call
-  const [, setTick] = useState(0);
+  const [_tick, setTick] = useState<number>(0);
   const startTicker = useCallback(() => {
     tickRef.current && clearInterval(tickRef.current);
     tickRef.current = setInterval(() => setTick(t => t + 1), 60_000); // once per minute is fine for minute-level display
@@ -326,12 +505,11 @@ export function SmartParkingDashboard() {
     if (!selectedLocationId) return;
     if (!quiet) setIsLoading(true);
     try {
-      const { slots, recommendedPollMs, serverTime: st } =
+      const { slots, recommendedPollMs } =
         await parkingSlotService.getDashboardSlots(selectedLocationId, selectedDate);
       setDashboardSlots(slots);
       setLastUpdated(new Date());
       setIsLive(true);
-      setServerTime(st);
       recommendedMs.current = recommendedPollMs;
       // Restart polling with server-recommended interval
       pollRef.current && clearInterval(pollRef.current);
@@ -364,7 +542,7 @@ export function SmartParkingDashboard() {
     dbSlot: s, ...parseLabel(s.label), category: typeToCategory[s.type] || 'regular',
   }));
   const currentFloorSlots = gridSlots.filter(g => g.dbSlot.floor === selectedFloor);
-  const rows = [...new Set(currentFloorSlots.map(g => g.row))].sort();
+  const currentRows = [...new Set(currentFloorSlots.map(g => g.row))].sort((a, b) => a.localeCompare(b));
   const selectedLocation = locations.find(l => l._id === selectedLocationId);
 
   // Per-slot live timing (recomputed each render tick)
@@ -465,7 +643,9 @@ export function SmartParkingDashboard() {
           if (category === 'vip') dbType = 'vip';
           if (category === 'motorcycle') dbType = 'motorcycle';
 
-          const size = (category === 'motorcycle') ? 'compact' : (['electric', 'vip'].includes(category) ? 'large' : 'standard');
+          let size = 'standard';
+          if (category === 'motorcycle') size = 'compact';
+          else if (category === 'electric' || category === 'vip') size = 'large';
 
           const shortLabel = `${row.rowLetter}${i}`;
           const label = config.floors > 1 ? `F${floor.floor}-${shortLabel}` : shortLabel;
@@ -490,7 +670,7 @@ export function SmartParkingDashboard() {
         await parkingSlotService.generateSlots({ locationId: selectedLocationId, slots });
       } else if (config.isEvenLayout && config.evenConfig) {
         // Safe fallback in case floorConfigs isn't provided
-        const sections = Array.from({ length: config.evenConfig.rows }, (_, i) => String.fromCharCode(65 + i));
+        const sections = Array.from({ length: config.evenConfig.rows }, (_, i) => String.fromCodePoint(65 + i));
         await parkingSlotService.generateSlots({ locationId: selectedLocationId, sections, slotsPerSection: config.evenConfig.columns, floors: config.floors });
       }
       toast.success('Slots fully synced to database!');
@@ -513,158 +693,96 @@ export function SmartParkingDashboard() {
     const Icon    = categoryIcons[selectedSlot.category];
     const Cat     = categoryStyles[selectedSlot.category];
 
-    const CategoryBadge = () => (
-      <span className={`flex items-center gap-1 px-2 py-1 ${Cat.bg} rounded-lg`}>
-        <Icon className="size-3 text-white" /><span className="text-[10px] font-bold text-white uppercase">{selectedSlot.category}</span>
-      </span>
-    );
+    const CatBadge = <CategoryBadge category={selectedSlot.category} Icon={Icon} Cat={Cat} />;
 
-    // ── Available — walk-in form
-    if (visual === 'available') return (
-      <div className="space-y-4">
-        <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X className="size-5" /></button>
-        <div className="flex items-center justify-between">
-          <div><h3 className="text-xl font-bold text-[#1e3d5a]">Walk-in Reservation</h3>
-            <p className="text-sm text-gray-400">Slot <span className="font-bold text-[#ee6b20]">{selectedSlot.dbSlot.label}</span> · Floor {selectedSlot.dbSlot.floor}</p></div>
-          <CategoryBadge />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Driver Name *</label><Input value={walkInForm.driverName} onChange={e => setWalkInForm({...walkInForm, driverName: e.target.value})} placeholder="Juan Dela Cruz" className="rounded-xl" /></div>
-          <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Plate *</label><Input value={walkInForm.plateNumber} onChange={e => setWalkInForm({...walkInForm, plateNumber: e.target.value})} placeholder="ABC 123" className="rounded-xl" /></div>
-          <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Color</label><Input value={walkInForm.carColor} onChange={e => setWalkInForm({...walkInForm, carColor: e.target.value})} placeholder="White" className="rounded-xl" /></div>
-          <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Type</label>
-            <select className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" value={walkInForm.vehicleType} onChange={e => setWalkInForm({...walkInForm, vehicleType: e.target.value})}>
-              {['Sedan','SUV','Van','Truck','Hatchback','Motorcycle'].map(t => <option key={t}>{t}</option>)}</select></div>
-          <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Phone</label><Input value={walkInForm.phoneNumber} onChange={e => setWalkInForm({...walkInForm, phoneNumber: e.target.value})} placeholder="+63 912 000 0000" className="rounded-xl" /></div>
-          <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Brand</label><Input value={walkInForm.brand} onChange={e => setWalkInForm({...walkInForm, brand: e.target.value})} placeholder="Toyota" className="rounded-xl" /></div>
-          <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Model</label><Input value={walkInForm.model} onChange={e => setWalkInForm({...walkInForm, model: e.target.value})} placeholder="Corolla" className="rounded-xl" /></div>
-        </div>
-        <div className="flex gap-3 pt-2 border-t">
-          <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1 rounded-xl">Cancel</Button>
-          <Button onClick={handleWalkInSave} className="flex-1 bg-[#ee6b20] hover:bg-[#d55f1c] rounded-xl"><Plus className="size-4 mr-2" />Reserve</Button>
-        </div>
-      </div>
-    );
-
-    // ── Walk-in details
-    if (walkIn) return (
-      <div className="space-y-4">
-        <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X className="size-5" /></button>
-        <div className="flex items-center justify-between">
-          <h3 className="text-xl font-bold text-[#1e3d5a]">Walk-in Details</h3><CategoryBadge />
-        </div>
-        <div className="space-y-2">
-          {[['Driver',walkIn.driverName],['Plate',walkIn.plateNumber],['Color',walkIn.carColor],['Vehicle',walkIn.vehicleType],['Brand',walkIn.brand],['Model',walkIn.model],['Phone',walkIn.phoneNumber]].map(([l,v]) => v ? (
-            <div key={l} className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="text-gray-400">{l}</span><span className="font-bold text-[#1e3d5a]">{v}</span></div>
-          ) : null)}
-        </div>
-        <div className="flex gap-3 pt-2 border-t">
-          <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1 rounded-xl">Close</Button>
-          <Button variant="destructive" onClick={() => handleWalkInCancel(key)} className="flex-1 rounded-xl">Remove Walk-in</Button>
-        </div>
-      </div>
-    );
-
-    // ── No-show — special panel
-    if (visual === 'no_show' && booking) return (
-      <div className="space-y-4">
-        <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X className="size-5" /></button>
-        <div className="flex items-center justify-between">
-          <div><h3 className="text-xl font-bold text-[#1e3d5a]">No-Show Detected</h3><p className="text-sm font-mono text-gray-400">{booking.reference}</p></div>
-          <span className="px-3 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-bold flex items-center gap-1"><AlertOctagon className="size-3" />NO-SHOW</span>
-        </div>
-        <div className="p-4 bg-gray-50 rounded-2xl border border-dashed border-gray-300 space-y-1">
-          <p className="text-sm text-gray-600">Grace period expired at <span className="font-bold">{timing?.gracePeriodExpiresAt}</span>. Customer did not check in.</p>
-          <p className="text-sm text-gray-500">Booking window: <span className="font-bold">{booking.timeSlot}</span></p>
-          {booking.user && <p className="text-sm text-gray-500">Customer: <span className="font-bold">{booking.user.name}</span></p>}
-          {booking.vehicle && <p className="text-sm text-[#ee6b20] font-bold">{booking.vehicle.plateNumber}</p>}
-        </div>
-        <div className="flex gap-3 pt-2 border-t">
-          <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1 rounded-xl">Close</Button>
-          <Button onClick={() => handleMarkNoShow(booking._id)} disabled={actionLoading} className="flex-1 bg-gray-700 hover:bg-gray-900 rounded-xl text-sm">
-            <AlertOctagon className="size-4 mr-2" />{actionLoading ? 'Processing…' : 'Mark No-Show & Free Slot'}
-          </Button>
-        </div>
-      </div>
-    );
-
-    // ── Reserved (upcoming — arriving soon or future)
-    if ((visual === 'reserved' || visual === 'arriving_soon' || visual === 'in_grace_period') && booking) {
-      const isGrace = visual === 'in_grace_period';
-      return (
-        <div className="space-y-4">
-          <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X className="size-5" /></button>
-          <div className="flex items-center justify-between">
-            <div><h3 className="text-xl font-bold text-[#1e3d5a]">{isGrace ? 'Grace Period' : 'Reservation'}</h3>
-              <p className="text-sm font-mono text-[#ee6b20]">{booking.reference}</p></div>
-            <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 ${isGrace ? 'bg-orange-100 text-orange-700 animate-pulse' : 'bg-yellow-100 text-yellow-700'}`}>
-              {isGrace ? <Timer className="size-3" /> : <AlarmClock className="size-3" />}
-              {isGrace ? `Grace: ${timing?.gracePeriodMinLeft}m left` : 'UPCOMING'}
-            </span>
-          </div>
-          {isGrace && (
-            <div className="p-3 bg-orange-50 rounded-xl border border-orange-200">
-              <p className="text-xs font-bold text-orange-800">⚠️ Grace period until {timing?.gracePeriodExpiresAt} — check if customer has arrived</p>
-            </div>
-          )}
-          <div className="space-y-2">
-            {booking.user && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><User className="size-3.5"/>Customer</span><span className="font-bold">{booking.user.name}</span></div>}
-            {booking.vehicle && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Car className="size-3.5"/>Plate</span><span className="font-bold text-[#ee6b20]">{booking.vehicle.plateNumber}</span></div>}
-            {booking.vehicle && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="text-gray-400">Vehicle</span><span className="font-bold">{booking.vehicle.brand} {booking.vehicle.model}</span></div>}
-            <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Clock className="size-3.5"/>Time</span><span className="font-bold">{booking.timeSlot}</span></div>
-            {booking.user?.phone && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Phone className="size-3.5"/>Phone</span><span className="font-bold">{booking.user.phone}</span></div>}
-            <div className="flex justify-between p-3 bg-yellow-50 rounded-xl text-sm border border-yellow-100"><span className="font-medium text-yellow-800">Paid</span><span className="font-bold text-[#1e3d5a]">₱{booking.amount}</span></div>
-          </div>
-          <div className="flex gap-3 pt-2 border-t">
-            <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1 rounded-xl">Close</Button>
-            <Button onClick={() => handleCheckIn(booking._id)} disabled={actionLoading} className="flex-1 bg-[#1e3d5a] hover:bg-[#16304a] rounded-xl">
-              <LogIn className="size-4 mr-2" />{actionLoading ? 'Processing…' : 'Check In'}
-            </Button>
-          </div>
-        </div>
-      );
-    }
-
-    // ── Occupied / Overstay
-    if ((visual === 'occupied' || visual === 'overstay') && booking) {
-      const isOver = visual === 'overstay';
-      return (
-        <div className="space-y-4">
-          <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X className="size-5" /></button>
-          <div className="flex items-center justify-between">
-            <div><h3 className="text-xl font-bold text-[#1e3d5a]">{isOver ? 'Overstay Detected' : 'Active Parking'}</h3>
-              <p className="text-sm font-mono text-[#ee6b20]">{booking.reference}</p></div>
-            <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 ${isOver ? 'bg-rose-100 text-rose-700' : 'bg-red-100 text-red-700'}`}>
-              {isOver ? <TrendingUp className="size-3" /> : <Car className="size-3" />}
-              {isOver ? `+${timing?.overstayMinutes}m OVERSTAY` : 'OCCUPIED'}
-            </span>
-          </div>
-          {isOver && (
-            <div className="p-3 bg-rose-50 rounded-xl border border-rose-200">
-              <p className="text-xs font-bold text-rose-800">⚠️ Vehicle exceeded booked time by {timing?.overstayMinutes} minutes. Expected out at {timing?.expectedEndAt}.</p>
-            </div>
-          )}
-          <div className="space-y-2">
-            {booking.user && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><User className="size-3.5"/>Customer</span><span className="font-bold">{booking.user.name}</span></div>}
-            {booking.vehicle && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Car className="size-3.5"/>Plate</span><span className="font-bold text-[#ee6b20]">{booking.vehicle.plateNumber}</span></div>}
-            {booking.vehicle && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="text-gray-400">Vehicle</span><span className="font-bold">{booking.vehicle.brand} {booking.vehicle.model} · {booking.vehicle.color}</span></div>}
-            <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Clock className="size-3.5"/>Booked</span><span className="font-bold">{booking.timeSlot}</span></div>
-            {booking.user?.phone && <div className="flex justify-between p-3 bg-gray-50 rounded-xl text-sm"><span className="flex items-center gap-2 text-gray-400"><Phone className="size-3.5"/>Phone</span><span className="font-bold">{booking.user.phone}</span></div>}
-            <div className="flex justify-between p-3 bg-[#1e3d5a]/5 rounded-xl text-sm border border-[#1e3d5a]/10"><span className="flex items-center gap-2 text-[#1e3d5a] font-medium"><CreditCard className="size-3.5"/>Paid</span><span className="font-bold text-[#1e3d5a]">₱{booking.amount}</span></div>
-          </div>
-          <div className="flex gap-3 pt-2 border-t">
-            <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1 rounded-xl">Close</Button>
-            <Button onClick={() => handleCheckOut(booking._id)} disabled={actionLoading} className={`flex-1 rounded-xl ${isOver ? 'bg-rose-600 hover:bg-rose-700' : 'bg-[#ee6b20] hover:bg-[#d55f1c]'}`}>
-              <LogOutIcon className="size-4 mr-2" />{actionLoading ? 'Processing…' : 'Check Out'}
-            </Button>
-          </div>
-        </div>
-      );
-    }
+    if (visual === 'available') return <WalkInReservationPanel selectedSlot={selectedSlot} walkInForm={walkInForm} setWalkInForm={setWalkInForm} setShowModal={setShowModal} handleWalkInSave={handleWalkInSave} CatBadge={CatBadge} />;
+    if (walkIn) return <WalkInDetailsPanel walkIn={walkIn} keyStr={key} setShowModal={setShowModal} handleWalkInCancel={handleWalkInCancel} CatBadge={CatBadge} />;
+    if (visual === 'no_show' && booking) return <NoShowPanel booking={booking} timing={timing} setShowModal={setShowModal} handleMarkNoShow={handleMarkNoShow} actionLoading={actionLoading} />;
+    if ((visual === 'reserved' || visual === 'arriving_soon' || visual === 'in_grace_period') && booking) return <UpcomingPanel isGrace={visual === 'in_grace_period'} booking={booking} timing={timing} setShowModal={setShowModal} handleCheckIn={handleCheckIn} actionLoading={actionLoading} />;
+    if ((visual === 'occupied' || visual === 'overstay') && booking) return <ActivePanel isOver={visual === 'overstay'} booking={booking} timing={timing} setShowModal={setShowModal} handleCheckOut={handleCheckOut} actionLoading={actionLoading} />;
     return null;
   };
 
-  const noSlotsConfigured = !isLoading && dashboardSlots.length === 0;
+  const isNoSlotsConfigured = !isLoading && dashboardSlots.length === 0;
+
+  const renderParkingGrid = (): JSX.Element | null => {
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center py-24 gap-4">
+          <RefreshCw className="size-7 text-[#ee6b20] animate-spin" />
+          <span className="text-gray-400 font-medium">Loading real-time slot data…</span>
+        </div>
+      );
+    }
+    if (isNoSlotsConfigured) {
+      return (
+        <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
+          <div className="size-16 bg-gray-50 rounded-2xl flex items-center justify-center">
+            <AlertTriangle className="size-8 text-gray-300" />
+          </div>
+          <div>
+            <p className="font-bold text-gray-500 text-lg">No parking slots configured yet</p>
+            <p className="text-sm text-gray-400 mt-1">Configure your parking lot layout to manage slots in real-time.</p>
+          </div>
+          <Button onClick={() => setShowConfigModal(true)} className="bg-[#ee6b20] hover:bg-[#d55f1c] rounded-xl">
+            <Settings className="size-4 mr-2" /> Configure Parking Lot
+          </Button>
+        </div>
+      );
+    }
+    return (
+      <div className="overflow-x-auto">
+        <div className="flex justify-between text-[10px] font-bold text-gray-300 uppercase tracking-widest mb-5 px-1">
+          <span>← Entry</span>
+          <span>Floor {selectedFloor} · {selectedLocation?.name?.toUpperCase() || 'PARKING'}</span>
+          <span>Exit →</span>
+        </div>
+        {currentRows.map(row => {
+          const rowSlots = currentFloorSlots.filter(g => g.row === row).sort((a, b) => a.number - b.number);
+          return (
+            <div key={row} className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 flex items-center justify-center font-bold text-[#1e3d5a] bg-blue-50 rounded-lg text-xs shrink-0">{row}</div>
+              <div className="flex gap-2 flex-wrap">
+                {rowSlots.map(g => {
+                  const timing   = getTiming(g);
+                  const walkIn   = walkIns[slotKey(g)];
+                  const visual   = resolveVisualState(g.dbSlot, timing, walkIn);
+                  const vc       = getVisualConfig(visual);
+                  const SlotIcon = vc.icon;
+                  const cursorCls = visual === 'maintenance' ? 'cursor-not-allowed' : 'cursor-pointer hover:scale-105';
+                  return (
+                    <button key={g.dbSlot._id}
+                      onClick={() => { if (visual !== 'maintenance') { setSelectedSlot(g); setShowModal(true); } }}
+                      title={`${g.dbSlot.label} · ${g.category} · ${visual}`}
+                      className={`relative group w-[4.25rem] h-[4.25rem] rounded-xl border-2 transition-all ${vc.card} ${cursorCls}`}>
+                      <div className="flex flex-col items-center justify-center h-full gap-0.5 px-1">
+                        <SlotIcon className={`size-3.5 ${vc.iconColor}`} />
+                        <span className="text-[10px] font-black text-[#1e3d5a] leading-none">{g.number}</span>
+                        {visual === 'available' ? null : <CountdownPill timing={timing} />}
+                      </div>
+                      <div className={`absolute top-1 left-1 size-2 rounded-full ${categoryStyles[g.category].bg}`} title={g.category} />
+                      {g.dbSlot.booking && !walkIn && (
+                        <div className="absolute -top-1.5 -right-1.5 size-3.5 bg-[#1e3d5a] rounded-full flex items-center justify-center">
+                          <CheckCircle className="size-2.5 text-white" />
+                        </div>
+                      )}
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-2 bg-[#1e3d5a] text-white text-[10px] rounded-xl shadow-xl whitespace-nowrap z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
+                        <p className="font-bold">{g.dbSlot.label} · {g.category}</p>
+                        <p className="text-white/60 capitalize">{visual.replace('_',' ')}</p>
+                        {g.dbSlot.booking?.vehicle?.plateNumber && <p className="text-[#ee6b20] font-bold mt-0.5">{g.dbSlot.booking.vehicle.plateNumber}</p>}
+                        {timing?.isInGracePeriod && <p className="text-orange-300">Grace: {timing.gracePeriodMinLeft}m left</p>}
+                        {timing?.isOverstay && <p className="text-rose-300">Overstay: +{timing.overstayMinutes}m</p>}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
@@ -709,8 +827,8 @@ export function SmartParkingDashboard() {
           <div className="flex items-center gap-3">
             <div className="p-2 bg-[#1e3d5a] rounded-xl"><CalendarIcon className="size-4 text-white" /></div>
             <div>
-              <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Date</label>
-              <Input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="rounded-xl h-9 border-gray-200 text-sm w-36" />
+              <label htmlFor="dash-date-picker" className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Date</label>
+              <Input id="dash-date-picker" type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="rounded-xl h-9 border-gray-200 text-sm w-36" />
             </div>
           </div>
 
@@ -731,9 +849,10 @@ export function SmartParkingDashboard() {
             </Button>
             {selectedLocationId && parkingConfig?.isEvenLayout && parkingConfig?.evenConfig && (
               <Button onClick={async () => {
-                const sections = Array.from({ length: parkingConfig!.evenConfig!.rows }, (_, i) => String.fromCharCode(65 + i));
+                const evenCfg = parkingConfig.evenConfig!;
+                const sections = Array.from({ length: evenCfg.rows }, (_, i) => String.fromCodePoint(65 + i));
                 setIsSyncing(true);
-                try { await parkingSlotService.generateSlots({ locationId: selectedLocationId, sections, slotsPerSection: parkingConfig!.evenConfig!.columns, floors: parkingConfig!.floors }); toast.success('Synced!'); await fetchSlots(); }
+                try { await parkingSlotService.generateSlots({ locationId: selectedLocationId, sections, slotsPerSection: evenCfg.columns, floors: parkingConfig.floors }); toast.success('Synced!'); await fetchSlots(); }
                 catch { toast.error('Sync failed'); } finally { setIsSyncing(false); }
               }} disabled={isSyncing} variant="outline" className="rounded-xl h-9 px-3 font-bold border-[#1e3d5a]/30 text-[#1e3d5a] text-sm">
                 <RefreshCw className={`size-3.5 mr-1.5 ${isSyncing ? 'animate-spin' : ''}`} /> Sync DB
@@ -752,7 +871,7 @@ export function SmartParkingDashboard() {
           <div className="flex flex-wrap gap-4 text-xs text-gray-400 pt-3 border-t border-gray-100">
             <span className="flex items-center gap-1"><MapPin className="size-3"/>{selectedLocation.address}</span>
             <span className="flex items-center gap-1"><Car className="size-3"/>{selectedLocation.availableSpots}/{selectedLocation.totalSpots} available</span>
-            <span className="flex items-center gap-1"><Clock className="size-3"/>{typeof selectedLocation.operatingHours === 'string' ? selectedLocation.operatingHours : (selectedLocation.operatingHours as any)?.open ? `${(selectedLocation.operatingHours as any).open} - ${(selectedLocation.operatingHours as any).close}` : '24/7'}</span>
+            <span className="flex items-center gap-1"><Clock className="size-3"/>{getOperatingHoursLabel(selectedLocation.operatingHours)}</span>
           </div>
         )}
       </div>
@@ -809,83 +928,7 @@ export function SmartParkingDashboard() {
 
       {/* Parking grid */}
       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-24 gap-4">
-            <RefreshCw className="size-7 text-[#ee6b20] animate-spin" />
-            <span className="text-gray-400 font-medium">Loading real-time slot data…</span>
-          </div>
-        ) : noSlotsConfigured ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
-            <div className="size-16 bg-gray-50 rounded-2xl flex items-center justify-center">
-              <AlertTriangle className="size-8 text-gray-300" />
-            </div>
-            <div>
-              <p className="font-bold text-gray-500 text-lg">No parking slots configured yet</p>
-              <p className="text-sm text-gray-400 mt-1">Configure your parking lot layout to manage slots in real-time.</p>
-            </div>
-            <Button onClick={() => setShowConfigModal(true)} className="bg-[#ee6b20] hover:bg-[#d55f1c] rounded-xl">
-              <Settings className="size-4 mr-2" /> Configure Parking Lot
-            </Button>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <div className="flex justify-between text-[10px] font-bold text-gray-300 uppercase tracking-widest mb-5 px-1">
-              <span>← Entry</span>
-              <span>Floor {selectedFloor} · {selectedLocation?.name?.toUpperCase() || 'PARKING'}</span>
-              <span>Exit →</span>
-            </div>
-            {rows.map(row => {
-              const rowSlots = currentFloorSlots.filter(g => g.row === row).sort((a, b) => a.number - b.number);
-              return (
-                <div key={row} className="flex items-center gap-2 mb-3">
-                  <div className="w-7 h-7 flex items-center justify-center font-bold text-[#1e3d5a] bg-blue-50 rounded-lg text-xs shrink-0">{row}</div>
-                  <div className="flex gap-2 flex-wrap">
-                    {rowSlots.map(g => {
-                      const timing   = getTiming(g);
-                      const walkIn   = walkIns[slotKey(g)];
-                      const visual   = resolveVisualState(g.dbSlot, timing, walkIn);
-                      const vc       = getVisualConfig(visual);   // safe — never undefined
-                      const CatIcon  = categoryIcons[g.category] ?? Grid3x3;
-                      const SlotIcon = vc.icon;
-
-                      return (
-                        <button key={g.dbSlot._id} onClick={() => { if (visual !== 'maintenance') { setSelectedSlot(g); setShowModal(true); } }}
-                          title={`${g.dbSlot.label} · ${g.category} · ${visual}`}
-                          className={`relative group w-[4.25rem] h-[4.25rem] rounded-xl border-2 transition-all ${vc.card} ${visual !== 'maintenance' ? 'cursor-pointer hover:scale-105' : 'cursor-not-allowed'}`}>
-
-                          <div className="flex flex-col items-center justify-center h-full gap-0.5 px-1">
-                            <SlotIcon className={`size-3.5 ${vc.iconColor}`} />
-                            <span className="text-[10px] font-black text-[#1e3d5a] leading-none">{g.number}</span>
-                            <CountdownPill timing={visual !== 'available' ? timing : null} />
-                          </div>
-
-                          {/* Category corner dot */}
-                          <div className={`absolute top-1 left-1 size-2 rounded-full ${categoryStyles[g.category].bg}`} title={g.category} />
-
-                          {/* Online booking indicator */}
-                          {g.dbSlot.booking && !walkIn && (
-                            <div className="absolute -top-1.5 -right-1.5 size-3.5 bg-[#1e3d5a] rounded-full flex items-center justify-center">
-                              <CheckCircle className="size-2.5 text-white" />
-                            </div>
-                          )}
-
-                          {/* Tooltip */}
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-2 bg-[#1e3d5a] text-white text-[10px] rounded-xl shadow-xl whitespace-nowrap z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
-                            <p className="font-bold">{g.dbSlot.label} · {g.category}</p>
-                            <p className="text-white/60 capitalize">{visual.replace('_',' ')}</p>
-                            {g.dbSlot.booking?.vehicle?.plateNumber && <p className="text-[#ee6b20] font-bold mt-0.5">{g.dbSlot.booking.vehicle.plateNumber}</p>}
-                            {timing?.isInGracePeriod && <p className="text-orange-300">Grace: {timing.gracePeriodMinLeft}m left</p>}
-                            {timing?.isOverstay && <p className="text-rose-300">Overstay: +{timing.overstayMinutes}m</p>}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        {renderParkingGrid()}
       </div>
 
       {/* Config modal */}
@@ -893,8 +936,19 @@ export function SmartParkingDashboard() {
 
       {/* Pricing Editor Modal */}
       {showPricingModal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setShowPricingModal(false)}>
-          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8" onClick={e => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+          onClick={() => setShowPricingModal(false)}
+          onKeyDown={e => { if (e.key === 'Escape') setShowPricingModal(false); }}
+          aria-label="Close pricing modal"
+          aria-modal="true"
+          role="dialog">
+          <div
+            className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8"
+            role="document"
+            tabIndex={-1}
+            onClick={e => e.stopPropagation()}
+            onKeyDown={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-xl font-black text-[#1e3d5a]">Overtime Pricing</h3>
@@ -908,9 +962,9 @@ export function SmartParkingDashboard() {
             <div className="space-y-4">
               {/* Free hours */}
               <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
-                <label className="block text-[10px] font-bold text-green-700 uppercase tracking-widest mb-2">
+                <span className="block text-[10px] font-bold text-green-700 uppercase tracking-widest mb-2">
                   Free Window (hours)
-                </label>
+                </span>
                 <p className="text-xs text-green-600 mb-3">Customers park FREE for the first N hours after check-in.</p>
                 <div className="flex items-center gap-3">
                   <button onClick={() => setPricingForm(p => ({ ...p, freeHours: Math.max(0, p.freeHours - 1) }))}
@@ -924,15 +978,15 @@ export function SmartParkingDashboard() {
                     className="size-9 rounded-xl bg-white border border-green-300 font-bold text-green-700 hover:bg-green-100 flex items-center justify-center text-lg">
                     +
                   </button>
-                  <span className="text-sm text-gray-400 font-medium">hr{pricingForm.freeHours !== 1 ? 's' : ''} free</span>
+                  <span className="text-sm text-gray-400 font-medium">{pricingForm.freeHours === 1 ? 'hr' : 'hrs'} free</span>
                 </div>
               </div>
 
               {/* Rate per hour */}
               <div className="bg-[#ee6b20]/5 border border-[#ee6b20]/20 rounded-2xl p-4">
-                <label className="block text-[10px] font-bold text-[#ee6b20] uppercase tracking-widest mb-2">
+                <span className="block text-[10px] font-bold text-[#ee6b20] uppercase tracking-widest mb-2">
                   Overtime Rate (₱/hr)
-                </label>
+                </span>
                 <p className="text-xs text-gray-400 mb-3">Charged per hour (ceiling) after the free window ends.</p>
                 <div className="flex items-center gap-3">
                   <button onClick={() => setPricingForm(p => ({ ...p, overtimeRate: Math.max(1, p.overtimeRate - 5) }))}
@@ -986,8 +1040,19 @@ export function SmartParkingDashboard() {
 
       {/* Slot detail modal */}
       {showModal && selectedSlot && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setShowModal(false)}>
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+          onClick={() => setShowModal(false)}
+          onKeyDown={e => { if (e.key === 'Escape') setShowModal(false); }}
+          aria-label="Close slot detail modal"
+          aria-modal="true"
+          role="dialog">
+          <div
+            className="bg-white rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto"
+            role="document"
+            tabIndex={-1}
+            onClick={e => e.stopPropagation()}
+            onKeyDown={e => e.stopPropagation()}>
             <div className="p-6 relative">{renderModalContent()}</div>
           </div>
         </div>

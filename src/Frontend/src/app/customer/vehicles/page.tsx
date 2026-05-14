@@ -74,7 +74,7 @@ export default function VehiclesPage() {
   /* save (add or update) ──────────────────────────────────────── */
   const handleSave = async () => {
     const plate = form.plateNumber.trim().toUpperCase();
-    const plateOk = /^[A-Z0-9]{2,4}[ ]?[0-9]{3,4}$|^[A-Z0-9]{1,8}$/.test(plate);
+    const plateOk = /^[A-Z\d]{2,4} ?\d{3,4}$|^[A-Z\d]{1,8}$/.test(plate);
     if (!plate || plate.length < 4 || !plateOk) { toast.error('Invalid plate number'); return; }
     if (!form.brand.trim()) { toast.error('Brand is required'); return; }
     if (!form.model.trim()) { toast.error('Model is required'); return; }
@@ -296,8 +296,11 @@ export default function VehiclesPage() {
               {vehicles.map((v: any, idx: number) => (
                 <div
                   key={v._id ?? v.id ?? idx}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setSelectedIdx(idx)}
-                  className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer group ${
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setSelectedIdx(idx); }}
+                  className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer group ${`
                     selectedIdx === idx
                       ? 'border-[#1e3d5a] bg-white shadow-sm'
                       : 'border-transparent bg-white hover:border-gray-200'
@@ -358,8 +361,9 @@ export default function VehiclesPage() {
             <div className="overflow-y-auto pr-2 -mr-2 space-y-5 flex-1">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider pl-1">Vehicle Type *</label>
+                  <label htmlFor="veh-type" className="text-[10px] font-bold text-gray-500 uppercase tracking-wider pl-1">Vehicle Type *</label>
                   <select
+                    id="veh-type"
                     className="w-full p-3.5 bg-gray-50/80 border border-gray-200 rounded-2xl text-sm font-medium text-[#1e3d5a] focus:bg-white focus:border-[#ee6b20] focus:ring-4 focus:ring-[#ee6b20]/10 outline-none appearance-none"
                     value={form.type}
                     onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
@@ -370,8 +374,9 @@ export default function VehiclesPage() {
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider pl-1">Brand *</label>
+                  <label htmlFor="veh-brand" className="text-[10px] font-bold text-gray-500 uppercase tracking-wider pl-1">Brand *</label>
                   <input
+                    id="veh-brand"
                     className="w-full p-3.5 bg-gray-50/80 border border-gray-200 rounded-2xl text-sm font-medium text-[#1e3d5a] focus:bg-white focus:border-[#ee6b20] focus:ring-4 focus:ring-[#ee6b20]/10 outline-none placeholder:text-gray-400"
                     value={form.brand}
                     onChange={e => setForm(f => ({ ...f, brand: e.target.value }))}
@@ -381,8 +386,9 @@ export default function VehiclesPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider pl-1">Model *</label>
+                <label htmlFor="veh-model" className="text-[10px] font-bold text-gray-500 uppercase tracking-wider pl-1">Model *</label>
                 <input
+                  id="veh-model"
                   className="w-full p-3.5 bg-gray-50/80 border border-gray-200 rounded-2xl text-sm font-medium text-[#1e3d5a] focus:bg-white focus:border-[#ee6b20] focus:ring-4 focus:ring-[#ee6b20]/10 outline-none placeholder:text-gray-400"
                   value={form.model}
                   onChange={e => setForm(f => ({ ...f, model: e.target.value }))}
@@ -392,8 +398,9 @@ export default function VehiclesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider pl-1">Plate Number *</label>
+                  <label htmlFor="veh-plate" className="text-[10px] font-bold text-gray-500 uppercase tracking-wider pl-1">Plate Number *</label>
                   <input
+                    id="veh-plate"
                     className="w-full p-3.5 bg-gray-50/80 border border-gray-200 rounded-2xl text-sm font-mono font-bold text-[#1e3d5a] uppercase focus:bg-white focus:border-[#ee6b20] focus:ring-4 focus:ring-[#ee6b20]/10 outline-none placeholder:text-gray-300"
                     maxLength={8}
                     value={form.plateNumber}
@@ -403,8 +410,9 @@ export default function VehiclesPage() {
                   <p className="text-[9px] text-gray-400 pl-1">Format: ABC 1234 (4–8 chars)</p>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider pl-1">Color *</label>
+                  <label htmlFor="veh-color" className="text-[10px] font-bold text-gray-500 uppercase tracking-wider pl-1">Color *</label>
                   <input
+                    id="veh-color"
                     className="w-full p-3.5 bg-gray-50/80 border border-gray-200 rounded-2xl text-sm font-medium text-[#1e3d5a] focus:bg-white focus:border-[#ee6b20] focus:ring-4 focus:ring-[#ee6b20]/10 outline-none placeholder:text-gray-400"
                     value={form.color}
                     onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
@@ -423,7 +431,10 @@ export default function VehiclesPage() {
                 {([['orDoc','Official Receipt (OR)', orRef], ['crDoc','Certificate of Registration (CR)', crRef]] as const).map(([field, label, ref]) => (
                   <div
                     key={field}
-                    onClick={() => (ref as React.RefObject<HTMLInputElement>).current?.click()}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => ref.current?.click()}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') ref.current?.click(); }}
                     className="group border-2 border-dashed border-gray-200 rounded-2xl p-4 flex items-center gap-4 hover:bg-orange-50/50 hover:border-[#ee6b20]/40 transition-all cursor-pointer"
                   >
                     <div className="p-3 bg-gray-50 rounded-xl group-hover:bg-white group-hover:shadow-sm transition-all">
@@ -437,7 +448,7 @@ export default function VehiclesPage() {
                     </div>
                     <Upload size={18} className="text-gray-300 group-hover:text-[#ee6b20] mr-2 transition-colors" />
                     <input
-                      type="file" ref={ref as any} hidden
+                      type="file" ref={ref} hidden
                       onChange={e => handleDoc(e, field as 'orDoc'|'crDoc')}
                     />
                   </div>
