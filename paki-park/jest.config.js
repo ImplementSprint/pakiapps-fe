@@ -4,18 +4,27 @@ const createJestConfig = nextJest({
   dir: './',
 });
 
-/** @type {import('jest').Config} */
-const config = {
-  testEnvironment: 'jsdom',
-  testMatch: ['**/tests/unit/**/*.test.{ts,tsx,js,jsx}'],
-  moduleNameMapper: {
-    // Mock next/font
-    '^next/font/(.*)$': '<rootDir>/__mocks__/nextFontMock.js',
-    '^next/image$': '<rootDir>/__mocks__/nextImageMock.js',
-    '\\.(css|less|scss|sass)$': '<rootDir>/__mocks__/styleMock.js',
-    '\\.(jpg|jpeg|png|gif|svg|webp|ico)$': '<rootDir>/__mocks__/fileMock.js',
+const customJestConfig = {
+  testEnvironment: 'jest-environment-jsdom',
+  roots: ['<rootDir>/tests', '<rootDir>/src'],
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  testPathIgnorePatterns: ['/node_modules/', '/.next/'],
+  modulePathIgnorePatterns: ['<rootDir>/.next/'],
+  collectCoverage: true,
+  collectCoverageFrom: [
+    '<rootDir>/src/**/*.{ts,tsx}',
+    '!<rootDir>/src/**/*.d.ts',
+    '!<rootDir>/src/app/**/*.{ts,tsx}',
+  ],
+  coverageReporters: ['text', 'lcov', 'json-summary'],
+  coverageThreshold: {
+    global: {
+      branches: 80,
+      functions: 80,
+      lines: 85,
+      statements: 85,
+    },
   },
-  coverageReporters: ['json-summary', 'text'],
 };
 
-module.exports = createJestConfig(config);
+module.exports = createJestConfig(customJestConfig);

@@ -1,11 +1,8 @@
 {
   "compilerOptions": {
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
-    "allowJs": true,
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": false,
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
@@ -14,7 +11,7 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "incremental": true,
     "plugins": [
       {
@@ -22,24 +19,16 @@
       }
     ],
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
-    },
-    "target": "ES2017",
-    "typeRoots": [
-      "./node_modules/@types"
-    ]
+      "@/*": ["./src/*"]
+    }
   },
   "include": [
     "next-env.d.ts",
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    ".next/types/**/*.ts"
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
   ],
-  "exclude": [
-    "node_modules",
-    "vite-app",
-    "__mocks__"
-  ]
+  "exclude": ["node_modules"]
 }
