@@ -83,7 +83,7 @@ function BookParkingContent() {
   const [savedMethods, setSavedMethods] = useState<PaymentMethod[]>([]);
 
   useEffect(() => {
-    paymentMethodService.getAll().then(methods => {
+    paymentMethodService.getAll().then((methods: PaymentMethod[]) => {
       setSavedMethods(methods);
       const def = methods.find((m: any) => m.isDefault);
       if (def) {
@@ -321,7 +321,7 @@ function BookParkingContent() {
               {/* Slot Selection */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest pl-1">Available 1-Hour Time Slots</label>
+                  <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest pl-1">Available 1-Hour Time Slots</p>
                   <span className="text-[10px] font-bold text-[#ee6b20] bg-orange-50 px-2.5 py-1 rounded-md">{timeSlots.length} Slots</span>
                 </div>
                 
@@ -566,7 +566,7 @@ function BookParkingContent() {
                     {/* Saved Payment Methods (Auto-Charge SCRUM-1018) */}
                     {savedMethods.length > 0 && (
                       <div className={`border-2 rounded-2xl overflow-hidden transition-all ${bookingData.paymentMethod === 'gcash_linked' ? 'border-[#ee6b20]' : 'border-gray-100'}`}>
-                        <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') setBookingData({ ...bookingData, paymentMethod: 'gcash_linked', savedPaymentMethodId: savedMethods[0].id }) }} className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => setBookingData({ ...bookingData, paymentMethod: 'gcash_linked', savedPaymentMethodId: savedMethods[0].id })}>
+                        <button type="button" onKeyDown={(e) => { if (e.key === 'Enter') setBookingData({ ...bookingData, paymentMethod: 'gcash_linked', savedPaymentMethodId: savedMethods[0].id }) }} className="w-full text-left p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => setBookingData({ ...bookingData, paymentMethod: 'gcash_linked', savedPaymentMethodId: savedMethods[0].id })}>
                           <div className="flex items-center gap-3">
                             <div className="size-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">💙</div>
                             <div>
@@ -575,7 +575,7 @@ function BookParkingContent() {
                             </div>
                           </div>
                           <ChevronDown className="size-5 text-gray-400" />
-                        </div>
+                        </button>
                         {bookingData.paymentMethod === 'gcash_linked' && (
                           <div className="px-4 pb-4 pt-2 border-t border-gray-100 bg-gray-50/50 space-y-2">
                             {savedMethods.map(m => (
@@ -596,7 +596,7 @@ function BookParkingContent() {
 
                     {/* E-Wallet Accordion */}
                     <div className={`border-2 rounded-2xl overflow-hidden transition-all ${bookingData.paymentMethod === 'GCash' || bookingData.paymentMethod === 'Maya' ? 'border-[#ee6b20]' : 'border-gray-100'}`}>
-                      <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') setBookingData({ ...bookingData, paymentMethod: 'GCash' }) }} className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => setBookingData({ ...bookingData, paymentMethod: 'GCash' })}>
+                      <button type="button" onKeyDown={(e) => { if (e.key === 'Enter') setBookingData({ ...bookingData, paymentMethod: 'GCash' }) }} className="w-full text-left p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => setBookingData({ ...bookingData, paymentMethod: 'GCash' })}>
                         <div className="flex items-center gap-3">
                           <div className="size-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center"><Smartphone className="size-5" /></div>
                           <div>
@@ -605,7 +605,7 @@ function BookParkingContent() {
                           </div>
                         </div>
                         <ChevronDown className="size-5 text-gray-400" />
-                      </div>
+                      </button>
                       
                       {(bookingData.paymentMethod === 'GCash' || bookingData.paymentMethod === 'Maya') && (
                         <div className="px-4 pb-4 pt-2 border-t border-gray-100 bg-gray-50/50 space-y-2">
@@ -624,7 +624,7 @@ function BookParkingContent() {
 
                     {/* Credit Card */}
                     <div className={`border-2 rounded-2xl overflow-hidden transition-all ${bookingData.paymentMethod === 'Credit/Debit Card' ? 'border-[#ee6b20]' : 'border-gray-100 hover:border-gray-200'}`}>
-                      <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') setBookingData({ ...bookingData, paymentMethod: 'Credit/Debit Card' }) }} className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => setBookingData({ ...bookingData, paymentMethod: 'Credit/Debit Card' })}>
+                      <button type="button" onKeyDown={(e) => { if (e.key === 'Enter') setBookingData({ ...bookingData, paymentMethod: 'Credit/Debit Card' }) }} className="w-full text-left p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => setBookingData({ ...bookingData, paymentMethod: 'Credit/Debit Card' })}>
                         <div className="flex items-center gap-3">
                           <div className="size-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center"><CreditCard className="size-5" /></div>
                           <div>
@@ -633,7 +633,7 @@ function BookParkingContent() {
                           </div>
                         </div>
                         {bookingData.paymentMethod === 'Credit/Debit Card' ? <CheckCircle2 className="size-5 text-[#ee6b20]" /> : <ChevronDown className="size-5 text-gray-400" />}
-                      </div>
+                      </button>
 
                       {bookingData.paymentMethod === 'Credit/Debit Card' && (
                         <div className="px-4 pb-6 pt-2 border-t border-gray-100 bg-gray-50/50">

@@ -409,6 +409,7 @@ interface SlotButtonProps {
   vc: ReturnType<typeof getVisualConfig>;
   timing: BookingTiming | null;
   walkIn: any;
+  // eslint-disable-next-line no-unused-vars
   onSelect: (g: GridSlot) => void;
 }
 function SlotButton({ g, visual, vc, timing, walkIn, onSelect }: Readonly<SlotButtonProps>) {
@@ -477,7 +478,7 @@ export function SmartParkingDashboard() {
   const recommendedMs = useRef(45_000);
 
   // Per-second tick to refresh countdowns without API call
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // eslint-disable-next-line no-unused-vars
   const [tickCount, setTickCount] = useState(0);
   const startTicker = useCallback(() => {
     tickRef.current && clearInterval(tickRef.current);
@@ -586,7 +587,7 @@ export function SmartParkingDashboard() {
   const selectedLocation = locations.find(l => l._id === selectedLocationId);
 
   // Per-slot live timing — tickCount read to force re-evaluation on each timer tick
-  const getTiming = (g: GridSlot) => { void tickCount; return recomputeTiming(g.dbSlot, today); };
+  const getTiming = (g: GridSlot) => { return recomputeTiming(g.dbSlot, today); };
 
   // Stats (respect no-show as "available" for operator clarity)
   const stats = {
@@ -957,22 +958,22 @@ export function SmartParkingDashboard() {
 
       {/* Pricing Editor Modal */}
       {showPricingModal && (
-        <div
-          role="presentation"
-          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
-          onClick={() => setShowPricingModal(false)}
-          onKeyDown={e => { if (e.key === 'Escape') setShowPricingModal(false); }}>
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Overtime Pricing"
-            tabIndex={0}
-            className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8"
-            onClick={e => e.stopPropagation()}
-            onKeyDown={e => e.stopPropagation()}>
+        <dialog
+          open
+          aria-labelledby="pricing-modal-title"
+          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm m-0 max-w-none w-full h-full border-none bg-transparent"
+        >
+          <button 
+            type="button" 
+            className="absolute inset-0 w-full h-full cursor-default bg-transparent border-none outline-none" 
+            aria-label="Close modal" 
+            onClick={() => setShowPricingModal(false)} 
+            tabIndex={-1} 
+          />
+          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8 relative z-10">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-xl font-black text-[#1e3d5a]">Overtime Pricing</h3>
+                <h3 id="pricing-modal-title" className="text-xl font-black text-[#1e3d5a]">Overtime Pricing</h3>
                 <p className="text-xs text-gray-400 mt-0.5">Set rates for {selectedLocation?.name ?? 'this location'}</p>
               </div>
               <button onClick={() => setShowPricingModal(false)} className="text-gray-400 hover:text-gray-600">
@@ -1056,27 +1057,27 @@ export function SmartParkingDashboard() {
               </Button>
             </div>
           </div>
-        </div>
+        </dialog>
       )}
 
       {/* Slot detail modal */}
       {showModal && selectedSlot && (
-        <div
-          role="presentation"
-          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
-          onClick={() => setShowModal(false)}
-          onKeyDown={e => { if (e.key === 'Escape') setShowModal(false); }}>
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Slot Details"
-            tabIndex={0}
-            className="bg-white rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto"
-            onClick={e => e.stopPropagation()}
-            onKeyDown={e => e.stopPropagation()}>
+        <dialog
+          open
+          aria-label="Slot Details"
+          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm m-0 max-w-none w-full h-full border-none bg-transparent"
+        >
+          <button 
+            type="button" 
+            className="absolute inset-0 w-full h-full cursor-default bg-transparent border-none outline-none" 
+            aria-label="Close modal" 
+            onClick={() => setShowModal(false)} 
+            tabIndex={-1} 
+          />
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto relative z-10">
             <div className="p-6 relative">{renderModalContent()}</div>
           </div>
-        </div>
+        </dialog>
       )}
     </div>
   );
