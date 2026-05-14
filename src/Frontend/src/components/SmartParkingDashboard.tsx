@@ -478,8 +478,7 @@ export function SmartParkingDashboard() {
   const recommendedMs = useRef(45_000);
 
   // Per-second tick to refresh countdowns without API call
-  // eslint-disable-next-line no-unused-vars
-  const [tickCount, setTickCount] = useState(0);
+  const [, setTickCount] = useState(0);
   const startTicker = useCallback(() => {
     tickRef.current && clearInterval(tickRef.current);
     tickRef.current = setInterval(() => setTickCount(n => n + 1), 60_000);
