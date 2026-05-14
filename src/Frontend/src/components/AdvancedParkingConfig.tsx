@@ -42,8 +42,43 @@ const categoryInfo = {
   compact: { label: 'Compact', icon: Grid3x3, color: 'bg-teal-500', textColor: 'text-teal-700' },
 };
 
+function getStepLabel(step: number, currentFloor: number) {
+  if (step === 1) return 'Basic Setup';
+  if (step === 2) return 'Layout Type';
+  if (step === 3) return `Configure Floor ${currentFloor}`;
+  return 'Assign Categories';
+}
+
+function NextButtonContent({ step, currentFloor, floors }: Readonly<{ step: number; currentFloor: number; floors: number }>) {
+  if (step === 4) return <><CheckCircle className="size-4" />Save Configuration</>;
+  if (step === 3 && currentFloor < floors) return <><span className="ml-1">Next Floor</span><ChevronRight className="size-4" /></>;
+  return <><span className="ml-1">Next</span><ChevronRight className="size-4" /></>;
+}
+
+function SlotGrid({ floor, row, onSelect }: Readonly<{ floor: number; row: RowConfig; onSelect: (f: number, r: string, s: number) => void }>) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {Array.from({ length: row.slotCount }).map((_, idx) => {
+        const slotNum = idx + 1;
+        const category = row.categories[slotNum] || 'regular';
+        const categoryColor = categoryInfo[category].color;
+        return (
+          <button
+            key={slotNum}
+            onClick={() => onSelect(floor, row.rowLetter, slotNum)}
+            className={`size-8 ${categoryColor} rounded-lg text-white text-xs font-bold hover:scale-110 transition-transform`}
+            title={`${floor}F-${row.rowLetter}${slotNum}`}
+          >
+            {slotNum}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // eslint-disable-next-line no-redeclare
-export function AdvancedParkingConfig({ isOpen, onClose, onSave, currentConfig }: AdvancedParkingConfigProps) {
+export function AdvancedParkingConfig({ isOpen, onClose, onSave, currentConfig }: Readonly<AdvancedParkingConfigProps>) {
   const [step, setStep] = useState(1);
   const [floors, setFloors] = useState(currentConfig?.floors || 1);
   const [isEvenLayout, setIsEvenLayout] = useState<boolean | null>(null);
@@ -51,47 +86,38 @@ export function AdvancedParkingConfig({ isOpen, onClose, onSave, currentConfig }
   const [evenColumns, setEvenColumns] = useState(currentConfig?.evenConfig?.columns || 15);
   const [currentFloor, setCurrentFloor] = useState(1);
   const [floorConfigs, setFloorConfigs] = useState<FloorConfig[]>([]);
-  const [editingCategories, setEditingCategories] = useState(false);
   const [selectedSlotForCategory, setSelectedSlotForCategory] = useState<{ floor: number; row: string; slot: number } | null>(null);
 
   if (!isOpen) return null;
 
+  const advanceStep2 = () => {
+    if (isEvenLayout === null) return;
+    if (isEvenLayout) {
+      initializeEvenFloorConfigs();
+      setStep(4);
+    } else {
+      initializeFloorConfigs();
+      setStep(3);
+    }
+  };
+
   const handleNext = () => {
-    if (step === 1) {
-      setStep(2);
-    } else if (step === 2) {
-      if (isEvenLayout === null) return;
-      
-      if (isEvenLayout) {
-        // Even layout - initialize floor configs and go to category assignment
-        initializeEvenFloorConfigs();
-        setStep(4); // Skip step 3, go directly to category assignment
-      } else {
-        // Uneven layout - go to custom configuration
-        initializeFloorConfigs();
-        setStep(3);
-      }
-    } else if (step === 3) {
-      // Check if on last floor
-      if (currentFloor < floors) {
-        setCurrentFloor(currentFloor + 1);
-      } else {
-        setStep(4); // Go to category assignment
-      }
-    } else if (step === 4) {
-      // Save configuration
-      const config: AdvancedParkingConfig = {
-        floors,
-        isEvenLayout: isEvenLayout ?? false,
-        evenConfig: isEvenLayout ? {
-          rows: evenRows,
-          columns: evenColumns,
-        } : undefined,
-        floorConfigs,
-      };
-      onSave(config);
-      onClose();
-      resetState();
+    switch (step) {
+      case 1:
+        setStep(2);
+        break;
+      case 2:
+        advanceStep2();
+        break;
+      case 3:
+        if (currentFloor < floors) setCurrentFloor(currentFloor + 1);
+        else setStep(4);
+        break;
+      case 4:
+        onSave({ floors, isEvenLayout: isEvenLayout ?? false, evenConfig: isEvenLayout ? { rows: evenRows, columns: evenColumns } : undefined, floorConfigs });
+        onClose();
+        resetState();
+        break;
     }
   };
 
@@ -116,7 +142,6 @@ export function AdvancedParkingConfig({ isOpen, onClose, onSave, currentConfig }
     setIsEvenLayout(null);
     setCurrentFloor(1);
     setFloorConfigs([]);
-    setEditingCategories(false);
     setSelectedSlotForCategory(null);
   };
 
@@ -139,7 +164,7 @@ export function AdvancedParkingConfig({ isOpen, onClose, onSave, currentConfig }
     for (let f = 1; f <= floors; f++) {
       const rows: RowConfig[] = [];
       for (let r = 0; r < evenRows; r++) {
-        const rowLetter = String.fromCharCode(65 + r);
+        const rowLetter = String.fromCodePoint(65 + r);
         rows.push({
           rowLetter,
           slotCount: evenColumns,
@@ -164,7 +189,7 @@ export function AdvancedParkingConfig({ isOpen, onClose, onSave, currentConfig }
     const currentConfig = floorConfigs.find(fc => fc.floor === currentFloor);
     if (!currentConfig) return;
     
-    const nextLetter = String.fromCharCode(65 + currentConfig.rows.length);
+    const nextLetter = String.fromCodePoint(65 + currentConfig.rows.length);
     if (currentConfig.rows.length >= 26) return; // Max 26 rows (A-Z)
     
     const newRow: RowConfig = {
@@ -184,7 +209,7 @@ export function AdvancedParkingConfig({ isOpen, onClose, onSave, currentConfig }
     // Re-letter rows
     const reletteredRows = newRows.map((r, idx) => ({
       ...r,
-      rowLetter: String.fromCharCode(65 + idx),
+      rowLetter: String.fromCodePoint(65 + idx),
     }));
     
     updateFloorRows(currentFloor, reletteredRows);
@@ -202,21 +227,9 @@ export function AdvancedParkingConfig({ isOpen, onClose, onSave, currentConfig }
   };
 
   const setSlotCategory = (floor: number, row: string, slot: number, category: SlotCategory) => {
-    setFloorConfigs(prev => 
-      prev.map(fc => {
-        if (fc.floor !== floor) return fc;
-        return {
-          ...fc,
-          rows: fc.rows.map(r => {
-            if (r.rowLetter !== row) return r;
-            return {
-              ...r,
-              categories: { ...r.categories, [slot]: category },
-            };
-          }),
-        };
-      })
-    );
+    const updateRow = (r: RowConfig) => r.rowLetter === row ? { ...r, categories: { ...r.categories, [slot]: category } } : r;
+    const updateFloor = (fc: FloorConfig) => fc.floor === floor ? { ...fc, rows: fc.rows.map(updateRow) } : fc;
+    setFloorConfigs(prev => prev.map(updateFloor));
   };
 
   const getCurrentFloorConfig = () => {
@@ -235,13 +248,13 @@ export function AdvancedParkingConfig({ isOpen, onClose, onSave, currentConfig }
 
   const getCategoryCount = (category: SlotCategory) => {
     let count = 0;
-    floorConfigs.forEach(fc => {
-      fc.rows.forEach(r => {
-        Object.values(r.categories).forEach(cat => {
+    for (const fc of floorConfigs) {
+      for (const r of fc.rows) {
+        for (const cat of Object.values(r.categories)) {
           if (cat === category) count++;
-        });
-      });
-    });
+        }
+      }
+    }
     return count;
   };
 
@@ -254,12 +267,7 @@ export function AdvancedParkingConfig({ isOpen, onClose, onSave, currentConfig }
             Advanced Parking Configuration
           </h2>
           <p className="text-white/80 text-sm">
-            Step {step} of 4: {
-              step === 1 ? 'Basic Setup' :
-              step === 2 ? 'Layout Type' :
-              step === 3 ? `Configure Floor ${currentFloor}` :
-              'Assign Categories'
-            }
+            Step {step} of 4: {getStepLabel(step, currentFloor)}
           </p>
           
           {/* Progress Bar */}
@@ -287,15 +295,16 @@ export function AdvancedParkingConfig({ isOpen, onClose, onSave, currentConfig }
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
+                <label htmlFor="floors-input" className="block text-sm font-bold text-gray-700 mb-2">
                   Number of Floors
                 </label>
                 <Input
+                  id="floors-input"
                   type="number"
                   min="1"
                   max="10"
                   value={floors}
-                  onChange={(e) => setFloors(parseInt(e.target.value) || 1)}
+                  onChange={(e) => setFloors(Number.parseInt(e.target.value, 10) || 1)}
                   className="text-2xl font-bold text-center h-16 rounded-xl"
                 />
               </div>
@@ -305,7 +314,7 @@ export function AdvancedParkingConfig({ isOpen, onClose, onSave, currentConfig }
                 <div className="flex flex-wrap gap-2">
                   {Array.from({ length: Math.min(floors, 10) }).map((_, i) => (
                     <div
-                      key={i}
+                      key={`floor-preview-${i + 1}`}
                       className="px-4 py-2 bg-[#1e3d5a] text-white rounded-xl font-semibold text-sm"
                     >
                       Floor {i + 1}
@@ -385,29 +394,31 @@ export function AdvancedParkingConfig({ isOpen, onClose, onSave, currentConfig }
                   
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="even-rows-input" className="block text-sm font-medium text-gray-700 mb-2">
                         Rows per Floor (1-26)
                       </label>
                       <Input
+                        id="even-rows-input"
                         type="number"
                         min="1"
                         max="26"
                         value={evenRows}
-                        onChange={(e) => setEvenRows(parseInt(e.target.value) || 1)}
+                        onChange={(e) => setEvenRows(Number.parseInt(e.target.value, 10) || 1)}
                         className="rounded-xl h-12 text-center font-bold"
                       />
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="even-cols-input" className="block text-sm font-medium text-gray-700 mb-2">
                         Slots per Row (1-30)
                       </label>
                       <Input
+                        id="even-cols-input"
                         type="number"
                         min="1"
                         max="30"
                         value={evenColumns}
-                        onChange={(e) => setEvenColumns(parseInt(e.target.value) || 1)}
+                        onChange={(e) => setEvenColumns(Number.parseInt(e.target.value, 10) || 1)}
                         className="rounded-xl h-12 text-center font-bold"
                       />
                     </div>
@@ -455,15 +466,16 @@ export function AdvancedParkingConfig({ isOpen, onClose, onSave, currentConfig }
                     </div>
                     
                     <div className="flex-1">
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                      <label htmlFor={`row-slot-input-${row.rowLetter}`} className="block text-xs font-medium text-gray-600 mb-1">
                         Number of Slots in Row {row.rowLetter}
                       </label>
                       <Input
+                        id={`row-slot-input-${row.rowLetter}`}
                         type="number"
                         min="1"
                         max="30"
                         value={row.slotCount}
-                        onChange={(e) => updateRowSlotCount(row.rowLetter, parseInt(e.target.value) || 1)}
+                        onChange={(e) => updateRowSlotCount(row.rowLetter, Number.parseInt(e.target.value, 10) || 1)}
                         className="rounded-lg h-10"
                       />
                     </div>
@@ -538,24 +550,11 @@ export function AdvancedParkingConfig({ isOpen, onClose, onSave, currentConfig }
                             <span className="text-xs text-gray-500">{row.slotCount} slots</span>
                           </div>
                           
-                          <div className="flex flex-wrap gap-1">
-                            {Array.from({ length: row.slotCount }).map((_, idx) => {
-                              const slotNum = idx + 1;
-                              const category = row.categories[slotNum] || 'regular';
-                              const categoryColor = categoryInfo[category].color;
-                              
-                              return (
-                                <button
-                                  key={slotNum}
-                                  onClick={() => setSelectedSlotForCategory({ floor: floorConfig.floor, row: row.rowLetter, slot: slotNum })}
-                                  className={`size-8 ${categoryColor} rounded-lg text-white text-xs font-bold hover:scale-110 transition-transform`}
-                                  title={`${floorConfig.floor}F-${row.rowLetter}${slotNum}`}
-                                >
-                                  {slotNum}
-                                </button>
-                              );
-                            })}
-                          </div>
+                          <SlotGrid 
+                            floor={floorConfig.floor} 
+                            row={row} 
+                            onSelect={(f, r, s) => setSelectedSlotForCategory({ floor: f, row: r, slot: s })} 
+                          />
                         </div>
                       ))}
                     </div>
@@ -586,22 +585,7 @@ export function AdvancedParkingConfig({ isOpen, onClose, onSave, currentConfig }
             disabled={step === 2 && isEvenLayout === null}
             className="bg-[#ee6b20] hover:bg-[#d55f1c] text-white gap-2 rounded-xl"
           >
-            {step === 4 ? (
-              <>
-                <CheckCircle className="size-4" />
-                Save Configuration
-              </>
-            ) : step === 3 && currentFloor < floors ? (
-              <>
-                Next Floor
-                <ChevronRight className="size-4" />
-              </>
-            ) : (
-              <>
-                Next
-                <ChevronRight className="size-4" />
-              </>
-            )}
+            <NextButtonContent step={step} currentFloor={currentFloor} floors={floors} />
           </Button>
         </div>
       </div>

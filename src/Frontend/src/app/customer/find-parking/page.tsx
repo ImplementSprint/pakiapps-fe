@@ -3,13 +3,12 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
-  ArrowLeft, MapPin, Search, Star, Clock, DollarSign,
-  Filter, RefreshCw, Car, Zap, ShieldCheck, CheckCircle,
+  ArrowLeft, MapPin, Search, DollarSign,
+  Filter, RefreshCw, Car, Zap, CheckCircle,
   AlertCircle, Layers, LogOut,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { toast } from 'sonner';
 import { locationsService } from '@/services/locationsService';
 import { vehiclesService } from '@/services/vehiclesService';
 import { authService } from '@/services/authService';
@@ -29,9 +28,11 @@ function availabilityColor(avail: number, total: number) {
   return 'text-red-600';
 }
 
-function OccupancyBar({ loc }: { loc: any }) {
+function OccupancyBar({ loc }: Readonly<{ loc: any }>) {
   const pct = occupancyPct(loc);
-  const color = pct < 50 ? 'bg-green-500' : pct < 80 ? 'bg-amber-500' : 'bg-red-500';
+  let color = 'bg-red-500';
+  if (pct < 50) color = 'bg-green-500';
+  else if (pct < 80) color = 'bg-amber-500';
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -40,6 +41,12 @@ function OccupancyBar({ loc }: { loc: any }) {
       <span className="text-xs font-bold text-gray-500 shrink-0">{pct}% full</span>
     </div>
   );
+}
+
+function getFilterLabel(f: string) {
+  if (f === 'available') return 'Has Availability';
+  if (f === 'ev') return 'EV Charging';
+  return 'All Locations';
 }
 
 export default function FindParkingPage() {
@@ -131,7 +138,7 @@ export default function FindParkingPage() {
             {(['all', 'available', 'ev'] as const).map(f => (
               <button key={f} onClick={() => setFilter(f)}
                 className={`px-4 py-1.5 rounded-full text-xs font-bold border-2 transition-all capitalize ${filter === f ? 'border-[#ee6b20] bg-[#ee6b20] text-white' : 'border-gray-200 text-gray-500 hover:border-[#ee6b20]/40 bg-white'}`}>
-                {f === 'all' ? 'All Locations' : f === 'available' ? 'Has Availability' : 'EV Charging'}
+                {getFilterLabel(f)}
               </button>
             ))}
           </div>
@@ -166,7 +173,7 @@ export default function FindParkingPage() {
           <div className="bg-white rounded-2xl shadow-sm p-14 text-center">
             <MapPin className="size-12 mx-auto text-gray-200 mb-4" />
             {locations.length === 0 ? (
-              <><p className="font-bold text-gray-700 text-lg">No active parking locations yet</p></>
+              <p className="font-bold text-gray-700 text-lg">No active parking locations yet</p>
             ) : (
               <><p className="font-bold text-gray-700 text-lg">No results for "{searchQuery}"</p><Button onClick={() => { setSearchQuery(''); setFilter('all'); }} className="mt-5 bg-[#ee6b20]">Clear Search</Button></>
             )}

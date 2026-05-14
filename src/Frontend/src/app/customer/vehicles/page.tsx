@@ -300,7 +300,7 @@ export default function VehiclesPage() {
                   tabIndex={0}
                   onClick={() => setSelectedIdx(idx)}
                   onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setSelectedIdx(idx); }}
-                  className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer group ${`
+                  className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer group ${
                     selectedIdx === idx
                       ? 'border-[#1e3d5a] bg-white shadow-sm'
                       : 'border-transparent bg-white hover:border-gray-200'
