@@ -88,7 +88,7 @@ function BookParkingContent() {
     setIsLoadingMethods(true);
     paymentMethodService.getAll().then(methods => {
       setSavedMethods(methods);
-      const def = methods.find(m => m.isDefault);
+      const def = methods.find((m: any) => m.isDefault);
       if (def) {
         setBookingData(prev => ({
           ...prev,
