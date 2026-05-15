@@ -13,7 +13,7 @@
     "test:k6": "k6 run tests/performance/script.k6.js"
   },
   "dependencies": {
-    "next": "^16.2.3",
+    "next": "16.3.0-canary.19",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
@@ -29,8 +29,14 @@
     "jest": "^30.3.0",
     "jest-environment-jsdom": "^30.3.0",
     "playwright": "^1.58.2",
+    "postcss": "^8.5.10",
     "tailwindcss": "^4.2.2",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2"
+  },
+  "overrides": {
+    "next": {
+      "postcss": ">=8.5.10"
+    }
   }
 }
