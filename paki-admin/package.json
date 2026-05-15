@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:e2e": "tsx tests/e2e/playwright-e2e.ts"
+    "test:e2e": "tsx tests/e2e/playwright-e2e.ts",
+    "test:k6": "k6 run tests/performance/script.k6.js"
   },
   "dependencies": {
     "next": "^16.2.3",

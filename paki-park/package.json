@@ -9,7 +9,9 @@
     "lint": "next lint",
     "lint:fix": "next lint --fix",
     "test": "jest --testPathPattern=tests/unit --coverageReporters=json-summary --forceExit",
-    "test:ci": "jest --testPathPattern=tests/unit --coverageReporters=json-summary --ci --forceExit"
+    "test:ci": "jest --testPathPattern=tests/unit --coverageReporters=json-summary --ci --forceExit",
+    "test:e2e": "tsx tests/e2e/playwright-e2e.ts",
+    "test:k6": "k6 run tests/performance/script.k6.js"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -80,8 +82,10 @@
     "globals": "^16.1.0",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
+    "playwright": "^1.58.2",
     "postcss": "^8.5.10",
     "tailwindcss": "^3.4.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.3.3"
   },
   "overrides": {
