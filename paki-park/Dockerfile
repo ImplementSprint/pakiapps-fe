@@ -5,7 +5,7 @@ RUN apk upgrade --no-cache
 FROM base AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 FROM base AS builder
 WORKDIR /app
@@ -17,7 +17,7 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package*.json ./
-RUN npm ci --omit=dev \
+RUN npm install --omit=dev \
 	&& npm cache clean --force \
 	&& rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 COPY --from=builder /app/.next ./.next
