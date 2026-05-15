@@ -77,7 +77,7 @@ function SlotGrid({ floor, row, onSelect }: Readonly<{ floor: number; row: RowCo
   );
 }
 
-// eslint-disable-next-line no-redeclare
+ 
 export function AdvancedParkingConfig({ isOpen, onClose, onSave, currentConfig }: Readonly<AdvancedParkingConfigProps>) {
   const [step, setStep] = useState(1);
   const [floors, setFloors] = useState(currentConfig?.floors || 1);
