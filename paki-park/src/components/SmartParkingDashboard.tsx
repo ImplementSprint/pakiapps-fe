@@ -409,7 +409,7 @@ interface SlotButtonProps {
   vc: ReturnType<typeof getVisualConfig>;
   timing: BookingTiming | null;
   walkIn: any;
-   
+  // eslint-disable-next-line no-unused-vars
   onSelect: (g: GridSlot) => void;
 }
 function SlotButton({ g, visual, vc, timing, walkIn, onSelect }: Readonly<SlotButtonProps>) {
