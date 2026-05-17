@@ -226,7 +226,7 @@ export default function CustomerHomePage() {
             {/* Nav Card 1 */}
             <div role="button" tabIndex={0} onClick={() => router.push('/customer/find-parking')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') router.push('/customer/find-parking'); }} className="group mt-20 bg-white rounded-[2rem] pt-16 pb-8 px-6 shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-2 hover:border-indigo-100 transition-all duration-300 cursor-pointer flex flex-col items-center text-center relative">
               <div className="absolute -top-24 left-1/2 -translate-x-1/2 h-44 w-44 transition-transform duration-500 group-hover:-translate-y-4 group-hover:scale-110 animate-in zoom-in">
-                <Image src="/assets/mascot_driving.png" alt="Reserve Parking mascot" fill className="object-contain drop-shadow-2xl" unoptimized />
+                <Image src="/assets/2f36e075afb851770b0825e8580b43ef7b12efb3.png" alt="Reserve Parking mascot" fill className="object-contain drop-shadow-2xl" unoptimized />
               </div>
               <h3 className="text-lg font-black text-[#1e3d5a]">Reserve Parking</h3>
               <p className="text-sm text-gray-500 font-medium mt-1">Book a parking spot</p>
@@ -235,7 +235,7 @@ export default function CustomerHomePage() {
             {/* Nav Card 2 */}
             <div role="button" tabIndex={0} onClick={() => router.push('/customer/bookings')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') router.push('/customer/bookings'); }} className="group mt-20 bg-white rounded-[2rem] pt-16 pb-8 px-6 shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-2 hover:border-blue-100 transition-all duration-300 cursor-pointer flex flex-col items-center text-center relative">
               <div className="absolute -top-24 left-1/2 -translate-x-1/2 h-44 w-44 transition-transform duration-500 group-hover:-translate-y-4 group-hover:scale-110 animate-in zoom-in delay-75">
-                <Image src="/assets/3ab94b49d340bf5c808a76004d2bebbd7166a97f.png" alt="My Bookings mascot" fill className="object-contain drop-shadow-2xl" unoptimized />
+                <Image src="/assets/6ba55cecd5b7106e37c71ca0e89f4f80eb706edd.png" alt="My Bookings mascot" fill className="object-contain drop-shadow-2xl" unoptimized />
               </div>
               <h3 className="text-lg font-black text-[#1e3d5a]">My Bookings</h3>
               <p className="text-sm text-gray-500 font-medium mt-1">View active bookings</p>

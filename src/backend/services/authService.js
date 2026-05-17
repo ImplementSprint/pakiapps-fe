@@ -2,41 +2,35 @@
 /**
  * authService.js — Supabase Auth edition
  * =======================================
- * All user identity now lives in Supabase's built-in `auth.users` table.
- * The `account.users` table still holds the PakiPark-specific profile columns
- * (role, phone, address, discounts, 2FA, etc.) and is joined on auth_id (uuid).
+ * Auth lives in Supabase auth.users.
+ * Profile data lives in public.users (integer PK, supabaseId UUID link).
  *
  * Flow:
- *   signUp  → supabase.auth.admin.createUser()  → inserts into auth.users
- *           → then upserts a matching row in account.users (role, phone, …)
+ *   signUp  → supabase.auth.admin.createUser() → inserts into auth.users
+ *           → upserts matching row in public.users (supabaseId = auth.user.id)
  *
  *   login   → supabase.auth.signInWithPassword() → validates via auth.users
- *           → fetches profile from account.users WHERE auth_id = auth.user.id
- *           → returns Supabase access_token (JWT signed by Supabase)
- *
- * The JWT returned is a Supabase-issued token. The protect middleware verifies it
- * using the Supabase JWT secret (SUPABASE_JWT_SECRET in .env).
+ *           → fetches profile from public.users WHERE "supabaseId" = auth.user.id
+ *           → returns Supabase access_token (JWT)
  */
 
 const { getSupabaseClient } = require('../config/supabaseClient');
 const { sequelize }         = require('../config/db');
 const { logUserLogin, logUserRegistered } = require('./logService');
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Fetch or create the account.users profile row that shadows an auth.users record.
- * @param {string} authId  - auth.users.id (uuid)
- * @param {object} defaults - columns to insert if the row doesn't exist yet
+ * Upsert a row in public.users keyed by supabaseId (UUID).
  */
 async function upsertProfile(authId, defaults = {}) {
   const [rows] = await sequelize.query(
-    `INSERT INTO account.users ("authId", name, email, phone, role, "isVerified", "createdAt", "updatedAt")
-     VALUES (:authId, :name, :email, :phone, :role, :isVerified, now(), now())
-     ON CONFLICT ("authId") DO UPDATE
+    `INSERT INTO public.users (name, email, phone, role, "isVerified", "supabaseId", password, "createdAt", "updatedAt")
+     VALUES (:name, :email, :phone, :role, :isVerified, :authId, :password, now(), now())
+     ON CONFLICT ("supabaseId") DO UPDATE
        SET name        = EXCLUDED.name,
            email       = EXCLUDED.email,
-           phone       = COALESCE(EXCLUDED.phone, account.users.phone),
+           phone       = COALESCE(EXCLUDED.phone, public.users.phone),
            "updatedAt" = now()
      RETURNING *`,
     {
@@ -44,9 +38,10 @@ async function upsertProfile(authId, defaults = {}) {
         authId,
         name:       defaults.name       || '',
         email:      defaults.email      || '',
-        phone:      defaults.phone      || '',
+        phone:      defaults.phone      || null,
         role:       defaults.role       || 'customer',
         isVerified: defaults.isVerified ?? false,
+        password:   '[SUPABASE_MANAGED]',
       },
     },
   );
@@ -54,11 +49,11 @@ async function upsertProfile(authId, defaults = {}) {
 }
 
 /**
- * Fetch a profile row by authId.
+ * Fetch a profile row by supabaseId.
  */
 async function getProfileByAuthId(authId) {
   const [rows] = await sequelize.query(
-    `SELECT * FROM account.users WHERE "authId" = :authId LIMIT 1`,
+    `SELECT * FROM public.users WHERE "supabaseId" = :authId LIMIT 1`,
     { replacements: { authId } },
   );
   return rows[0] || null;
@@ -69,11 +64,11 @@ async function getProfileByAuthId(authId) {
 const registerCustomer = async ({ name, email, phone, password }) => {
   const supabase = getSupabaseClient();
 
-  // 1. Create user in Supabase auth.users (service_role bypasses email confirmation)
+  // 1. Create user in Supabase auth.users
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
     email,
     password,
-    email_confirm: true,          // mark as confirmed immediately
+    email_confirm: true,
     user_metadata: { name, phone, role: 'customer' },
   });
 
@@ -81,7 +76,7 @@ const registerCustomer = async ({ name, email, phone, password }) => {
 
   const authUser = authData.user;
 
-  // 2. Upsert matching profile in account.users
+  // 2. Upsert profile in public.users
   const profile = await upsertProfile(authUser.id, {
     name,
     email: authUser.email,
@@ -92,27 +87,19 @@ const registerCustomer = async ({ name, email, phone, password }) => {
 
   logUserRegistered({ userId: profile.id, role: 'customer' });
 
-  // 3. Sign in to get a valid session token for the new user
+  // 3. Sign in to get session token
   const { data: session, error: signInError } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
   if (signInError) throw new Error(signInError.message);
 
-  return {
-    _id:    String(profile.id),
-    authId: authUser.id,
-    name:   profile.name,
-    email:  profile.email,
-    role:   profile.role,
-    token:  session.session.access_token,
-    refreshToken: session.session.refresh_token,
-  };
+  return buildResponse(profile, authUser.id, session.session);
 };
 
 // ── Register Admin / Partner / Teller ────────────────────────────────────────
 
-const registerAdmin = async ({ name, email, phone, password, accessCode, address, dateOfBirth, role: requestedRole }) => {
+const registerAdmin = async ({ name, email, phone, password, accessCode, role: requestedRole }) => {
   if (accessCode !== process.env.ADMIN_ACCESS_CODE) {
     throw new Error('Invalid admin access code');
   }
@@ -150,15 +137,7 @@ const registerAdmin = async ({ name, email, phone, password, accessCode, address
   });
   if (signInError) throw new Error(signInError.message);
 
-  return {
-    _id:    String(profile.id),
-    authId: authUser.id,
-    name:   profile.name,
-    email:  profile.email,
-    role:   profile.role,
-    token:  session.session.access_token,
-    refreshToken: session.session.refresh_token,
-  };
+  return buildResponse(profile, authUser.id, session.session);
 };
 
 // ── Login ─────────────────────────────────────────────────────────────────────
@@ -166,34 +145,42 @@ const registerAdmin = async ({ name, email, phone, password, accessCode, address
 const loginUser = async ({ email, password }) => {
   const supabase = getSupabaseClient();
 
-  // Supabase validates credentials against auth.users
   const { data: session, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
-  if (error) throw new Error('Invalid credentials');
+  if (error) throw new Error('Invalid credentials. Please check your email and password.');
 
   const authUser = session.user;
 
-  // Fetch the PakiPark profile from account.users
-  const profile = await getProfileByAuthId(authUser.id);
+  // Fetch profile from public.users
+  let profile = await getProfileByAuthId(authUser.id);
 
   if (!profile) {
-    // Edge case: auth.users exists but no account.users row yet — create one
-    const newProfile = await upsertProfile(authUser.id, {
-      name:  authUser.user_metadata?.name  || authUser.email.split('@')[0],
-      email: authUser.email,
-      phone: authUser.user_metadata?.phone || '',
-      role:  authUser.user_metadata?.role  || 'customer',
-      isVerified: true,
-    });
-    logUserLogin({ userId: newProfile.id, role: newProfile.role });
-    return buildResponse(newProfile, authUser.id, session.session);
-  }
+    // Maybe the user exists in public.users but supabaseId is null? Look up by email.
+    const [existingRows] = await sequelize.query(
+      `SELECT * FROM public.users WHERE email = :email LIMIT 1`,
+      { replacements: { email: authUser.email } }
+    );
 
-  if (profile.deletedAt) {
-    throw new Error('This account has been deleted');
+    if (existingRows.length > 0) {
+      // User exists! Link their supabaseId.
+      await sequelize.query(
+        `UPDATE public.users SET "supabaseId" = :authId WHERE id = :id`,
+        { replacements: { authId: authUser.id, id: existingRows[0].id } }
+      );
+      profile = { ...existingRows[0], supabaseId: authUser.id };
+    } else {
+      // Completely new user: create row.
+      profile = await upsertProfile(authUser.id, {
+        name:  authUser.user_metadata?.name  || authUser.email.split('@')[0],
+        email: authUser.email,
+        phone: authUser.user_metadata?.phone || null,
+        role:  authUser.user_metadata?.role  || 'customer',
+        isVerified: true,
+      });
+    }
   }
 
   logUserLogin({ userId: profile.id, role: profile.role });
@@ -203,15 +190,15 @@ const loginUser = async ({ email, password }) => {
 
 function buildResponse(profile, authId, session) {
   return {
-    _id:          String(profile.id),
+    _id:            String(profile.id),
     authId,
-    name:         profile.name,
-    email:        profile.email,
-    role:         profile.role,
+    name:           profile.name,
+    email:          profile.email,
+    role:           profile.role,
     profilePicture: profile.profilePicture || null,
-    token:        session.access_token,
-    refreshToken: session.refresh_token,
-    expiresAt:    session.expires_at,
+    token:          session.access_token,
+    refreshToken:   session.refresh_token,
+    expiresAt:      session.expires_at,
   };
 }
 
@@ -231,9 +218,8 @@ const refreshToken = async ({ refreshToken: rt }) => {
 // ── Logout ────────────────────────────────────────────────────────────────────
 
 const logoutUser = async ({ refreshToken: rt }) => {
-  // Supabase server-side sign-out invalidates the refresh token
   const supabase = getSupabaseClient();
-  await supabase.auth.admin.signOut(rt).catch(() => null); // best-effort
+  await supabase.auth.admin.signOut(rt).catch(() => null);
   return { success: true };
 };
 

@@ -36,7 +36,7 @@ const Notification = sequelize.define(
   },
   {
     tableName:  'notifications',
-    schema: 'notifications',
+    schema: 'public',
     timestamps: true,
     indexes: [
       // Primary read path: user's unread notifications (bell badge count)

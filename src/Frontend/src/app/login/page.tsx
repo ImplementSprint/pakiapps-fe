@@ -54,8 +54,8 @@ export default function LoginPage() {
     } else if (!isPhone && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.identifier)) {
       newErrors.identifier = 'Please enter a valid email address.'; hasError = true;
     }
-    if (!/^(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/.test(formData.password)) {
-      newErrors.password = '8+ chars, 1 number, and 1 special char required.'; hasError = true;
+    if (!formData.password) {
+      newErrors.password = 'Password is required.'; hasError = true;
     }
     setErrors(newErrors);
     if (hasError) return;
@@ -123,7 +123,7 @@ export default function LoginPage() {
               <p className="text-[#8492a6] font-medium text-sm">Welcome back! Enter your credentials to continue.</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6" suppressHydrationWarning>
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-[#1e3d5a] tracking-widest uppercase opacity-70 px-1 block">Email or Mobile Number</label>
                 <div className="flex gap-2">
@@ -134,7 +134,7 @@ export default function LoginPage() {
                     </div>
                     <input type="text" placeholder={isPhone ? '9123456789' : 'your@email.com'}
                       className={`h-14 w-full pl-12 pr-4 bg-[#f8fafc] border ${errors.identifier ? 'border-red-400' : 'border-[#e2e8f0]'} rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3d5a]/20 focus:border-[#1e3d5a]`}
-                      value={formData.identifier} onChange={handleIdentifierChange} required />
+                      value={formData.identifier} onChange={handleIdentifierChange} required suppressHydrationWarning />
                   </div>
                 </div>
                 {errors.identifier && <p className="text-[10px] text-red-500 font-bold px-1">{errors.identifier}</p>}
@@ -146,8 +146,8 @@ export default function LoginPage() {
                   <Shield className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-[#8492a6]" />
                   <input type={showPassword ? 'text' : 'password'} placeholder="••••••••"
                     className={`h-14 w-full pl-12 pr-12 bg-[#f8fafc] border ${errors.password ? 'border-red-400' : 'border-[#e2e8f0]'} rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3d5a]/20 focus:border-[#1e3d5a]`}
-                    value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} required />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#8492a6]">
+                    value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} required suppressHydrationWarning />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#8492a6]" suppressHydrationWarning>
                     {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
                   </button>
                 </div>
@@ -206,7 +206,7 @@ export default function LoginPage() {
                 <div className="w-14 h-14 bg-[#f4f7fa] rounded-2xl flex items-center justify-center"><Lock className="w-6 h-6 text-[#ee6b20]" /></div>
                 <div><h3 className="text-2xl font-bold text-[#1e3d5a]">Reset Password</h3><p className="text-[#8492a6] text-sm mt-1">Enter your email to receive a reset link.</p></div>
                 <input type="text" placeholder="your@email.com" value={forgotIdentifier} onChange={e => setForgotIdentifier(e.target.value)}
-                  className="h-14 w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-4 focus:outline-none focus:ring-2 focus:ring-[#1e3d5a]/20" />
+                  className="h-14 w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-4 focus:outline-none focus:ring-2 focus:ring-[#1e3d5a]/20" suppressHydrationWarning />
                 <button onClick={() => setResetSent(true)} disabled={forgotIdentifier.length < 5}
                   className="w-full h-14 bg-[#ee6b20] disabled:opacity-50 text-white font-bold rounded-xl flex items-center justify-center gap-2">
                   Send Reset Link <ArrowRight className="w-4 h-4" />

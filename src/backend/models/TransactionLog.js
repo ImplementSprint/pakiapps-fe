@@ -2,24 +2,17 @@ const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
 
 /**
- * TransactionLog
- * --------------
- * Immutable financial record for every payment, refund, and reversal.
- * One row per monetary event — never updated, only appended.
+ * TransactionLog — aligned with public.transaction_logs (integer IDs, camelCase).
+ * Immutable — append-only, no updates.
  */
 const TransactionLog = sequelize.define(
   'TransactionLog',
   {
-    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-
-    // FK references (soft — no DB-level cascade so logs survive entity deletes)
+    id:        { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     bookingId: { type: DataTypes.INTEGER, allowNull: true },
     userId:    { type: DataTypes.INTEGER, allowNull: true },
-
-    // Human-readable reference (copy of booking.reference, e.g. PKP-00000001)
     reference: { type: DataTypes.STRING(30), allowNull: true },
 
-    // Financial details
     transactionType: {
       type: DataTypes.ENUM('payment', 'refund', 'partial_refund', 'reversal', 'adjustment'),
       allowNull: false,
@@ -29,32 +22,27 @@ const TransactionLog = sequelize.define(
       type: DataTypes.ENUM('GCash', 'PayMaya', 'Credit/Debit Card', 'Cash', 'System'),
       allowNull: false,
     },
-    amount:   { type: DataTypes.FLOAT,       allowNull: false },
-    currency: { type: DataTypes.STRING(5),   allowNull: false, defaultValue: 'PHP' },
-
+    amount:   { type: DataTypes.FLOAT,     allowNull: false },
+    currency: { type: DataTypes.STRING(5), allowNull: false, defaultValue: 'PHP' },
     status: {
       type: DataTypes.ENUM('success', 'failed', 'pending', 'refunded'),
       allowNull: false,
       defaultValue: 'success',
     },
-
-    description: { type: DataTypes.TEXT,  allowNull: true },
-
-    // Arbitrary extra data (card last 4, GCash number, error code, etc.)
-    metadata: { type: DataTypes.JSONB, defaultValue: {} },
+    description: { type: DataTypes.TEXT, allowNull: true },
+    metadata:    { type: DataTypes.JSONB, defaultValue: {} },
   },
   {
-    tableName:  'transaction_logs',
-    schema: 'reservation',
+    tableName: 'transaction_logs',
+    schema: 'public',
     timestamps: true,
-    updatedAt:  false,   // logs are append-only — no updates
+    updatedAt: false,
     indexes: [
       { name: 'idx_txlogs_booking',   fields: ['bookingId'] },
       { name: 'idx_txlogs_user',      fields: ['userId'] },
       { name: 'idx_txlogs_reference', fields: ['reference'] },
       { name: 'idx_txlogs_type',      fields: ['transactionType'] },
       { name: 'idx_txlogs_status',    fields: ['status'] },
-      { name: 'idx_txlogs_createdat', fields: ['createdAt'] },
     ],
   }
 );

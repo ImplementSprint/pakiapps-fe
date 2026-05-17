@@ -7,7 +7,7 @@
  * to req.user so the rest of the app sees the same shape as before.
  */
 
-const jwt         = require('jsonwebtoken');
+const { getSupabaseClient } = require('../config/supabaseClient');
 const { sequelize } = require('../config/db');
 
 /**
@@ -25,16 +25,21 @@ const protect = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'Not authorized, no token' });
     }
 
-    // Verify against Supabase JWT secret (HS256)
-    const secret  = process.env.SUPABASE_JWT_SECRET;
-    const decoded = jwt.verify(token, secret);
+    // Verify using Supabase SDK instead of manual jwt verification
+    const supabase = getSupabaseClient();
+    const { data: { user: authUser }, error: verifyError } = await supabase.auth.getUser(token);
 
-    // decoded.sub is the auth.users uuid
-    const authId = decoded.sub;
+    if (verifyError || !authUser) {
+      console.error('[Auth Middleware] Token invalid:', verifyError?.message);
+      return res.status(401).json({ success: false, message: 'Not authorized, token failed' });
+    }
 
-    // Fetch the account.users profile linked to this auth identity
+    // authUser.id is the auth.users uuid
+    const authId = authUser.id;
+
+    // Fetch the public.users profile linked to this auth identity
     const [rows] = await sequelize.query(
-      `SELECT * FROM account.users WHERE "authId" = :authId LIMIT 1`,
+      `SELECT * FROM public.users WHERE "supabaseId" = :authId LIMIT 1`,
       { replacements: { authId } },
     );
 
@@ -55,6 +60,7 @@ const protect = async (req, res, next) => {
 
     next();
   } catch (error) {
+    console.error('[Auth Middleware Error]:', error);
     return res.status(401).json({ success: false, message: 'Not authorized, token failed' });
   }
 };

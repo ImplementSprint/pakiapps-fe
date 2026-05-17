@@ -3,7 +3,7 @@
  * Next.js version — uses NEXT_PUBLIC_API_URL env var
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:5000/api';
+const API_BASE_URL = '/api';
 
 interface ApiResponse<T = any> {
   success: boolean;
@@ -36,7 +36,8 @@ class ApiClient {
       const response = await fetch(url, { ...options, headers: { ...this.getHeaders(), ...options.headers } });
       const data = await response.json();
       if (!response.ok) {
-        if (response.status === 401 && typeof window !== 'undefined') {
+        // Global 401 handler: log out user ONLY if it wasn't the login endpoint itself failing
+        if (response.status === 401 && typeof window !== 'undefined' && !endpoint.includes('/auth/login')) {
           ['authToken', 'userRole', 'userName', 'userEmail', 'userId', 'userPhone', 'userProfilePic'].forEach(k => localStorage.removeItem(k));
           window.location.href = '/login';
         }

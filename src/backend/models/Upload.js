@@ -23,7 +23,7 @@ const Upload = sequelize.define(
   {
     id:           { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     userId:       { type: DataTypes.INTEGER, allowNull: false },
-    entityType:   { type: DataTypes.ENUM('user_avatar', 'vehicle_or', 'vehicle_cr'), allowNull: false },
+    entityType:   { type: DataTypes.ENUM('user_avatar', 'vehicle_or', 'vehicle_cr', 'discount_id', 'partner_doc'), allowNull: false },
     entityId:     { type: DataTypes.INTEGER, allowNull: false },
     filename:     { type: DataTypes.STRING(255), allowNull: false },
     originalName: { type: DataTypes.STRING(255) },
@@ -33,7 +33,7 @@ const Upload = sequelize.define(
   },
   {
     tableName:  'uploads',
-    schema: 'teller',
+    schema: 'public',
     timestamps: true,
     indexes: [
       { name: 'idx_uploads_user',   fields: ['userId'] },

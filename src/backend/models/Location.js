@@ -1,53 +1,49 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
 
+/**
+ * Location — parking facility.
+ * Aligned with public.locations schema.
+ */
 const Location = sequelize.define(
   'Location',
   {
-    id:             { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    name:           { type: DataTypes.STRING,  allowNull: false },
-    address:        { type: DataTypes.STRING,  allowNull: false },
-    lat:            { type: DataTypes.FLOAT },
-    lng:            { type: DataTypes.FLOAT },
-    totalSpots:     { type: DataTypes.INTEGER, allowNull: false, defaultValue: 100 },
-    availableSpots: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 100 },
-    hourlyRate:     { type: DataTypes.FLOAT,   allowNull: false, defaultValue: 50 },
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+    },
+    name:    { type: DataTypes.STRING,  allowNull: false },
+    address: { type: DataTypes.STRING,  allowNull: false },
+    lat:     { type: DataTypes.FLOAT,   allowNull: true },
+    lng:     { type: DataTypes.FLOAT,   allowNull: true },
+    totalSpots:     { type: DataTypes.INTEGER, defaultValue: 100 },
+    availableSpots: { type: DataTypes.INTEGER, defaultValue: 100 },
+    hourlyRate:     { type: DataTypes.FLOAT,   defaultValue: 50 },
     status: {
-      type: DataTypes.ENUM('active', 'maintenance', 'closed'),
+      type: DataTypes.ENUM('active', 'inactive', 'maintenance'),
       defaultValue: 'active',
     },
-    operatingHours: {
-      type: DataTypes.JSONB,
-      defaultValue: {
-        mon: { open: '06:00', close: '23:00', closed: false },
-        tue: { open: '06:00', close: '23:00', closed: false },
-        wed: { open: '06:00', close: '23:00', closed: false },
-        thu: { open: '06:00', close: '23:00', closed: false },
-        fri: { open: '06:00', close: '23:00', closed: false },
-        sat: { open: '06:00', close: '23:00', closed: false },
-        sun: { open: '06:00', close: '23:00', closed: false },
-      },
-    },
+    operatingHours: { type: DataTypes.JSONB, defaultValue: {} },
     amenities:      { type: DataTypes.ARRAY(DataTypes.TEXT), defaultValue: [] },
+    partnerId:      { type: DataTypes.INTEGER, allowNull: true },
+    operatingHoursJson: { type: DataTypes.JSONB, allowNull: true },
   },
   {
-    tableName:  'locations',
-    schema: 'parking_lot',
+    tableName: 'locations',
+    schema: 'public',
     timestamps: true,
     indexes: [
-      // ── Active locations list (most common public query) ───────────────
-      { name: 'idx_locations_status', fields: ['status'] },
-
-      // ── Geo-proximity lookup (if map search is added) ──────────────────
-      { name: 'idx_locations_lat_lng', fields: ['lat', 'lng'] },
+      { name: 'idx_locations_status',  fields: ['status'] },
+      { name: 'idx_locations_partner', fields: ['partnerId'] },
     ],
   }
 );
 
 Location.prototype.toJSON = function () {
-  const values = Object.assign({}, this.get());
-  values._id = String(values.id);
-  return values;
+  const v = Object.assign({}, this.get());
+  v._id = String(v.id);
+  return v;
 };
 
 module.exports = Location;

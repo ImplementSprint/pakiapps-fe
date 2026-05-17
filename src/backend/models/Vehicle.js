@@ -1,6 +1,9 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
 
+/**
+ * Vehicle — aligned with public.vehicles (integer IDs, camelCase).
+ */
 const Vehicle = sequelize.define(
   'Vehicle',
   {
@@ -14,19 +17,16 @@ const Vehicle = sequelize.define(
       type: DataTypes.ENUM('sedan', 'suv', 'van', 'truck', 'motorcycle', 'hatchback', 'pickup'),
       defaultValue: 'sedan',
     },
-    orDoc:       { type: DataTypes.TEXT,    defaultValue: null },
-    crDoc:       { type: DataTypes.TEXT,    defaultValue: null },
-    isDefault:   { type: DataTypes.BOOLEAN, defaultValue: false }, // pre-selected for new bookings
+    orDoc:     { type: DataTypes.TEXT,    defaultValue: null },
+    crDoc:     { type: DataTypes.TEXT,    defaultValue: null },
+    isDefault: { type: DataTypes.BOOLEAN, defaultValue: false },
   },
   {
     tableName:  'vehicles',
-    schema: 'teller',
+    schema: 'public',
     timestamps: true,
     indexes: [
-      // SELECT * FROM vehicles WHERE "userId"=$1
-      { name: 'idx_vehicles_user', fields: ['userId'] },
-
-      // Plate number lookup (admin search, conflict checks)
+      { name: 'idx_vehicles_user',  fields: ['userId'] },
       { name: 'idx_vehicles_plate', fields: ['plateNumber'] },
     ],
   }

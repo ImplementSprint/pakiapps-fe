@@ -11,16 +11,11 @@ async function checkSchema() {
   try {
     const [bookings] = await sequelize.query("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'reservation' AND table_name = 'bookings'");
     console.log('--- reservation.bookings ---');
-    console.table(bookings);
+    bookings.forEach(c => console.log(`${c.column_name} (${c.data_type})`));
 
-    const [users] = await sequelize.query("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'account' AND table_name = 'users'");
-    console.log('--- account.users ---');
-    console.table(users);
-
-    const [locations] = await sequelize.query("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'parking_lot' AND table_name = 'locations'");
-    console.log('--- parking_lot.locations ---');
-    console.table(locations);
-
+    const [slots] = await sequelize.query("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'parking_lot' AND table_name = 'parking_slots'");
+    console.log('\n--- parking_lot.parking_slots ---');
+    slots.forEach(c => console.log(`${c.column_name} (${c.data_type})`));
   } catch (err) {
     console.error(err);
   } finally {
