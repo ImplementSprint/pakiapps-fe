@@ -55,7 +55,7 @@ async function getToken() {
  * @param {string|null} token Bearer token (null for auth call)
  * @returns {Promise<object>} parsed JSON response
  */
-function _request(method, path, body = null, token = null) {
+function _rawRequest(method, path, body = null, token = null) {
   return new Promise((resolve, reject) => {
     const parsed    = new URL(BASE_URL + _normalisePath(path));
     const isHttps   = parsed.protocol === 'https:';
@@ -87,14 +87,21 @@ function _request(method, path, body = null, token = null) {
       res.on('data', c => { data += c; });
       res.on('end', () => {
         try {
-          const parsed = JSON.parse(data);
+          const parsedRes = JSON.parse(data);
           if (res.statusCode >= 400) {
-            const msg = parsed.message || parsed.error || `HTTP ${res.statusCode}`;
-            return reject(new Error(`[ApiCenter] ${method} ${path} → ${res.statusCode}: ${msg}`));
+            const errorObj = parsedRes.error || parsedRes.message || parsedRes;
+            const msg = typeof errorObj === 'object' ? JSON.stringify(errorObj) : errorObj;
+            const err = new Error(`[ApiCenter] ${method} ${path} → ${res.statusCode}: ${msg}`);
+            err.statusCode = res.statusCode;
+            return reject(err);
           }
-          resolve(parsed);
+          resolve(parsedRes);
         } catch {
-          if (res.statusCode >= 400) return reject(new Error(`[ApiCenter] HTTP ${res.statusCode}`));
+          if (res.statusCode >= 400) {
+            const err = new Error(`[ApiCenter] HTTP ${res.statusCode}`);
+            err.statusCode = res.statusCode;
+            return reject(err);
+          }
           resolve({ raw: data });
         }
       });
@@ -106,6 +113,32 @@ function _request(method, path, body = null, token = null) {
     if (bodyStr) req.write(bodyStr);
     req.end();
   });
+}
+
+/**
+ * Retrying wrapper for the API Center requests.
+ */
+async function _request(method, path, body = null, token = null) {
+  let attempt = 0;
+  const maxAttempts = 5;
+  let delay = 600; // ms
+
+  while (attempt < maxAttempts) {
+    try {
+      return await _rawRequest(method, path, body, token);
+    } catch (err) {
+      attempt++;
+      const isRateLimit = err.statusCode === 429 || 
+                          (err.statusCode === 502 && err.message && (err.message.includes('Too many requests') || err.message.includes('rate limit')));
+      if (isRateLimit && attempt < maxAttempts) {
+        console.warn(`[ApiCenter] Rate limit hit (attempt ${attempt}/${maxAttempts}). Retrying in ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+        delay *= 2; // exponential backoff
+      } else {
+        throw err;
+      }
+    }
+  }
 }
 
 /** Normalise API Center path prefixes per the SDK convention. */

@@ -103,9 +103,9 @@ async function testRegister() {
     phone:     TARGET.phone,
     password:  TARGET.password,
   });
-  if ([200, 201].includes(r.status)) {
-    PASS(`Registered | role: ${r.body.role} | authId: ${r.body.authId}`);
-    return r.body.token;
+  if ([200, 201].includes(r.status) && r.body.data) {
+    PASS(`Registered | role: ${r.body.data.role} | authId: ${r.body.data.authId}`);
+    return r.body.data.token;
   }
   if (r.body?.message?.toLowerCase().includes('already') || r.status === 409) {
     INFO('Already registered — continuing to login tests');
@@ -118,22 +118,22 @@ async function testRegister() {
 async function testLoginEmail() {
   HEAD('3. Login with Email');
   const r = await request('POST', '/auth/login', { email: TARGET.email, password: TARGET.password });
-  if (r.status === 200 && r.body.token) {
-    PASS(`Email login OK | role: ${r.body.role} | name: ${r.body.name || r.body.firstName}`);
-    return r.body.token;
+  if (r.status === 200 && r.body.data && r.body.data.token) {
+    PASS(`Email login OK | role: ${r.body.data.role} | name: ${r.body.data.name || r.body.data.firstName}`);
+    return r.body.data.token;
   }
-  FAIL('Email login', `HTTP ${r.status} — ${r.body?.message}`);
+  FAIL('Email login', `HTTP ${r.status} — ${r.body?.message || r.body?.data?.message}`);
   return null;
 }
 
 async function testLoginPhone() {
   HEAD('4. Login with Phone Number');
   const r = await request('POST', '/auth/login', { email: TARGET.phone, password: TARGET.password });
-  if (r.status === 200 && r.body.token) {
-    PASS(`Phone login OK | phone: ${r.body.phone || TARGET.phone}`);
-    return r.body.token;
+  if (r.status === 200 && r.body.data && r.body.data.token) {
+    PASS(`Phone login OK | phone: ${r.body.data.phone || TARGET.phone}`);
+    return r.body.data.token;
   }
-  FAIL('Phone login', `HTTP ${r.status} — ${r.body?.message}`);
+  FAIL('Phone login', `HTTP ${r.status} — ${r.body?.message || r.body?.data?.message}`);
   return null;
 }
 

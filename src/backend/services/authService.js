@@ -299,11 +299,11 @@ const loginUser = async ({ email, password }) => {
   let authEmail = email;
   if (isPhoneIdentifier(email)) {
     const [rows] = await sequelize.query(
-      `SELECT id FROM account.profiles WHERE phone = :phone LIMIT 1`,
+      `SELECT id, email FROM account.profiles WHERE phone = :phone LIMIT 1`,
       { replacements: { phone: email } }
     );
     if (rows.length === 0) throw new Error('No account found with this phone number.');
-    authEmail = phoneToSyntheticEmail(email);
+    authEmail = rows[0].email || phoneToSyntheticEmail(email);
   }
 
   const { data: session, error } = await supabase.auth.signInWithPassword({ email: authEmail, password });

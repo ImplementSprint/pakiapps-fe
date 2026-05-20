@@ -141,7 +141,7 @@ const sendPasswordReset = async (userEmail, resetToken) => {
  */
 const sendBookingReminder = async (userEmail, bookingData) => {
   const html = _wrap(`
-    <h2 style="color: #1e3d5a; margin-top: 0;">⏰ Parking Reminder</h2>
+    <h2 style="color: #1e3d5a; margin-top: 0;">Parking Reminder</h2>
     <p style="color: #444;">Just a reminder that your parking at <strong>${bookingData.location || bookingData.locationName}</strong> starts soon.</p>
     <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
       <tr><td style="padding: 8px; color: #666;">Reference</td><td style="padding: 8px; font-weight: bold;">${bookingData.reference}</td></tr>
@@ -150,7 +150,7 @@ const sendBookingReminder = async (userEmail, bookingData) => {
     </table>
     <p style="color: #666; font-size: 13px;">Please have your booking reference ready for the teller. Drive safe!</p>
   `);
-  await sendEmail(userEmail, `⏰ Parking Reminder — ${bookingData.date}`, html);
+  await sendEmail(userEmail, `Parking Reminder — ${bookingData.date}`, html);
 };
 
 /**
