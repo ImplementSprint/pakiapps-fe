@@ -1,10 +1,12 @@
 /**
  * Upload model — tracks every file stored on the server.
+ * Aligned with teller.uploads (NOT public.uploads).
+ * userId is UUID (Supabase auth id / account.profiles.id).
  *
  * ┌─────────────┬────────────────────────────────────────────────────────────┐
  * │  Column     │  Purpose                                                   │
  * ├─────────────┼────────────────────────────────────────────────────────────┤
- * │  userId     │  Owner of the file (FK → users)                            │
+ * │  userId     │  Owner of the file (UUID → account.profiles.id)           │
  * │  entityType │  'user_avatar' | 'vehicle_or' | 'vehicle_cr'              │
  * │  entityId   │  ID of the related row (userId for avatars, vehicleId…)    │
  * │  filename   │  Stored filename on disk (unique per upload)               │
@@ -22,8 +24,11 @@ const Upload = sequelize.define(
   'Upload',
   {
     id:           { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    userId:       { type: DataTypes.INTEGER, allowNull: false },
-    entityType:   { type: DataTypes.ENUM('user_avatar', 'vehicle_or', 'vehicle_cr', 'discount_id', 'partner_doc'), allowNull: false },
+    userId:       { type: DataTypes.UUID,    allowNull: false },
+    entityType:   {
+      type: DataTypes.ENUM('user_avatar', 'vehicle_or', 'vehicle_cr', 'discount_id', 'partner_doc'),
+      allowNull: false,
+    },
     entityId:     { type: DataTypes.INTEGER, allowNull: false },
     filename:     { type: DataTypes.STRING(255), allowNull: false },
     originalName: { type: DataTypes.STRING(255) },
@@ -33,11 +38,11 @@ const Upload = sequelize.define(
   },
   {
     tableName:  'uploads',
-    schema: 'public',
+    schema:     'teller',          // ← teller schema (NO public)
     timestamps: true,
     indexes: [
-      { name: 'idx_uploads_user',   fields: ['userId'] },
-      { name: 'idx_uploads_entity', fields: ['entityType', 'entityId'] },
+      { name: 'idx_teller_uploads_user',   fields: ['userId'] },
+      { name: 'idx_teller_uploads_entity', fields: ['entityType', 'entityId'] },
     ],
   }
 );

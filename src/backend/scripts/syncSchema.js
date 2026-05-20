@@ -34,7 +34,7 @@ const EXTRA_INDEXES = [
     name: 'idx_reservation.bookings_location_date_active',
     sql: `
       CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_reservation.bookings_location_date_active
-        ON reservation.bookings ("locationId", date)
+        ON reservation.bookings (location_id, date)
         WHERE status IN ('upcoming', 'active');
     `,
     desc: 'reservation.bookings — partial: location+date for active/upcoming (conflict check)',
@@ -45,8 +45,8 @@ const EXTRA_INDEXES = [
     name: 'idx_reservation.bookings_slot_date_active',
     sql: `
       CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_reservation.bookings_slot_date_active
-        ON reservation.bookings ("parkingSlotId", date)
-        WHERE "parkingSlotId" IS NOT NULL AND status IN ('upcoming', 'active');
+        ON reservation.bookings (parking_slot_id, date)
+        WHERE parking_slot_id IS NOT NULL AND status IN ('upcoming', 'active');
     `,
     desc: 'reservation.bookings — partial: slot+date for time-window conflict check',
   },
@@ -56,7 +56,7 @@ const EXTRA_INDEXES = [
     name: 'idx_reservation.bookings_user_createdat_desc',
     sql: `
       CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_reservation.bookings_user_createdat_desc
-        ON reservation.bookings ("userId", "createdAt" DESC);
+        ON reservation.bookings (user_id, "createdAt" DESC);
     `,
     desc: 'reservation.bookings — customer list, newest first',
   },
@@ -108,7 +108,7 @@ const EXTRA_INDEXES = [
     name: 'idx_txlogs_booking_createdat',
     sql: `
       CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_txlogs_booking_createdat
-        ON reservation.transaction_logs ("bookingId", "createdAt" DESC);
+        ON reservation.transaction_logs (booking_id, created_at DESC);
     `,
     desc: 'reservation.transaction_logs — all transactions for a booking, newest first',
   },
@@ -116,26 +116,18 @@ const EXTRA_INDEXES = [
     name: 'idx_txlogs_user_createdat',
     sql: `
       CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_txlogs_user_createdat
-        ON reservation.transaction_logs ("userId", "createdAt" DESC);
+        ON reservation.transaction_logs (user_id, created_at DESC);
     `,
     desc: 'reservation.transaction_logs — all transactions for a user, newest first',
   },
-  {
-    name: 'idx_txlogs_method_status',
-    sql: `
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_txlogs_method_status
-        ON reservation.transaction_logs ("paymentMethod", status);
-    `,
-    desc: 'reservation.transaction_logs — payment method distribution',
-  },
+
   {
     name: 'idx_txlogs_type_createdat',
     sql: `
       CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_txlogs_type_createdat
-        ON reservation.transaction_logs ("transactionType", "createdAt" DESC)
-        WHERE status = 'success';
+        ON reservation.transaction_logs (type, created_at DESC);
     `,
-    desc: 'reservation.transaction_logs — partial: successful transactions by type',
+    desc: 'reservation.transaction_logs — transactions by type, newest first',
   },
 
   // ActivityLog
@@ -189,7 +181,7 @@ const VIEWS = [
         )                                                 AS "occupancyPct"
       FROM parking_lot.locations l
       LEFT JOIN reservation.bookings b
-        ON b."locationId" = l.id
+        ON b.location_id = l.id
        AND b.date = CURRENT_DATE
        AND b.status IN ('upcoming', 'active', 'completed')
       GROUP BY l.id, l.name, l."totalSpots", l."availableSpots";
@@ -203,7 +195,7 @@ const VIEWS = [
       CREATE OR REPLACE VIEW v_slot_status_today AS
       SELECT
         ps.id                                       AS "slotId",
-        ps."locationId",
+        ps.location_id                              AS "locationId",
         ps.label,
         ps.section,
         ps.floor,
@@ -228,7 +220,7 @@ const VIEWS = [
         b."vehicleModel"
       FROM parking_lot.parking_slots ps
       LEFT JOIN reservation.bookings b
-        ON b."parkingSlotId" = ps.id
+        ON b.parking_slot_id = ps.id
        AND b.date = CURRENT_DATE
        AND b.status IN ('upcoming', 'active');
     `,

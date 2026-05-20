@@ -83,14 +83,21 @@ export default function AdminHomePage() {
     }).catch(() => {});
   }, []);
 
-  const menuItems = [
+  const isPartner = adminProfile.role === 'business_partner';
+  const isTeller  = adminProfile.role === 'teller';
+
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => setIsMounted(true), []);
+
+  const allMenuItems = [
     { id: 'dashboard', label: 'Dashboard',          icon: LayoutDashboard },
     { id: 'parking',   label: 'Parking Management', icon: Car },
     { id: 'bookings',  label: 'Booking Management', icon: List },
-    { id: 'locations', label: 'Locations',           icon: MapPin },
-    { id: 'analytics', label: 'Analytics',           icon: TrendingUp },
+    { id: 'locations', label: 'Locations',           icon: MapPin,     hidden: isPartner || isTeller },
+    { id: 'analytics', label: 'Analytics',           icon: TrendingUp, hidden: isPartner },
     { id: 'settings',  label: 'Settings',            icon: Settings },
   ];
+  const menuItems = isMounted ? allMenuItems.filter(item => !item.hidden) : allMenuItems;
 
   // Close profile dropdown on outside click
   const dropdownRef = useRef<HTMLDivElement>(null);

@@ -128,18 +128,26 @@ export default function CustomerHomePage() {
             </button>
           </div>
 
-          {activeVehicle === null || activeVehicle === undefined ? (
-            <div role="button" tabIndex={0} className="bg-white rounded-3xl border border-dashed border-gray-300 p-8 flex flex-col items-center justify-center gap-2 hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => router.push('/customer/vehicles')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') router.push('/customer/vehicles'); }}>
+          {!activeVehicle ? (
+            <button 
+              type="button"
+              className="w-full bg-white rounded-3xl border border-dashed border-gray-300 p-8 flex flex-col items-center justify-center gap-2 hover:bg-gray-50 transition-colors" 
+              onClick={() => router.push('/customer/vehicles')}
+            >
               <div className="size-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 mb-2">
                 <Car size={24} />
               </div>
               <p className="font-bold text-[#1e3d5a]">No vehicles saved</p>
               <p className="text-sm text-gray-500">Click to add your first vehicle</p>
-            </div>
+            </button>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
               {/* Active Vehicle Card (Main) */}
-              <div role="button" tabIndex={0} className="lg:col-span-8 group relative overflow-hidden bg-white/70 backdrop-blur-md rounded-3xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all active:scale-[0.99] cursor-pointer" onClick={() => router.push('/customer/vehicles')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') router.push('/customer/vehicles'); }}>
+              <button 
+                type="button"
+                className="lg:col-span-8 group relative overflow-hidden bg-white/70 backdrop-blur-md rounded-3xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all active:scale-[0.99] text-left" 
+                onClick={() => router.push('/customer/vehicles')}
+              >
                 <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none group-hover:scale-110 transition-transform duration-700 text-[#1e3d5a]">
                   <VehicleIcon type={activeVehicle.type} size={140} />
                 </div>
@@ -173,7 +181,7 @@ export default function CustomerHomePage() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </button>
 
               {/* Sidebar List (Other vehicles placeholder snippet) */}
               <div className="lg:col-span-4 flex flex-col gap-3">
@@ -224,31 +232,43 @@ export default function CustomerHomePage() {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Nav Card 1 */}
-            <div role="button" tabIndex={0} onClick={() => router.push('/customer/find-parking')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') router.push('/customer/find-parking'); }} className="group mt-20 bg-white rounded-[2rem] pt-16 pb-8 px-6 shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-2 hover:border-indigo-100 transition-all duration-300 cursor-pointer flex flex-col items-center text-center relative">
+            <button 
+              type="button"
+              onClick={() => router.push('/customer/find-parking')} 
+              className="group mt-20 bg-white rounded-[2rem] pt-16 pb-8 px-6 shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-2 hover:border-indigo-100 transition-all duration-300 flex flex-col items-center text-center relative"
+            >
               <div className="absolute -top-24 left-1/2 -translate-x-1/2 h-44 w-44 transition-transform duration-500 group-hover:-translate-y-4 group-hover:scale-110 animate-in zoom-in">
                 <Image src="/assets/2f36e075afb851770b0825e8580b43ef7b12efb3.png" alt="Reserve Parking mascot" fill className="object-contain drop-shadow-2xl" unoptimized />
               </div>
               <h3 className="text-lg font-black text-[#1e3d5a]">Reserve Parking</h3>
               <p className="text-sm text-gray-500 font-medium mt-1">Book a parking spot</p>
-            </div>
+            </button>
 
             {/* Nav Card 2 */}
-            <div role="button" tabIndex={0} onClick={() => router.push('/customer/bookings')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') router.push('/customer/bookings'); }} className="group mt-20 bg-white rounded-[2rem] pt-16 pb-8 px-6 shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-2 hover:border-blue-100 transition-all duration-300 cursor-pointer flex flex-col items-center text-center relative">
+            <button 
+              type="button"
+              onClick={() => router.push('/customer/bookings')} 
+              className="group mt-20 bg-white rounded-[2rem] pt-16 pb-8 px-6 shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-2 hover:border-blue-100 transition-all duration-300 flex flex-col items-center text-center relative"
+            >
               <div className="absolute -top-24 left-1/2 -translate-x-1/2 h-44 w-44 transition-transform duration-500 group-hover:-translate-y-4 group-hover:scale-110 animate-in zoom-in delay-75">
                 <Image src="/assets/6ba55cecd5b7106e37c71ca0e89f4f80eb706edd.png" alt="My Bookings mascot" fill className="object-contain drop-shadow-2xl" unoptimized />
               </div>
               <h3 className="text-lg font-black text-[#1e3d5a]">My Bookings</h3>
               <p className="text-sm text-gray-500 font-medium mt-1">View active bookings</p>
-            </div>
+            </button>
 
             {/* Nav Card 3 — FAQ (SCRUM-999) */}
-            <div role="button" tabIndex={0} onClick={() => router.push('/help')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') router.push('/help'); }} className="group mt-20 bg-white rounded-[2rem] pt-16 pb-8 px-6 shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-2 hover:border-yellow-100 transition-all duration-300 cursor-pointer flex flex-col items-center text-center relative">
+            <button 
+              type="button"
+              onClick={() => router.push('/help')}
+              className="group mt-20 bg-white rounded-[2rem] pt-16 pb-8 px-6 shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-2 hover:border-yellow-100 transition-all duration-300 flex flex-col items-center text-center relative"
+            >
               <div className="absolute -top-24 left-1/2 -translate-x-1/2 h-44 w-44 transition-transform duration-500 group-hover:-translate-y-4 group-hover:scale-110 animate-in zoom-in delay-150">
                 <Image src="/assets/49e0d16aae0cfb13df1b2acdc4fbd4b2ab68795e.png" alt="Help & FAQ mascot" fill className="object-contain drop-shadow-2xl" unoptimized />
               </div>
               <h3 className="text-lg font-black text-[#1e3d5a]">Help &amp; FAQ</h3>
               <p className="text-sm text-gray-500 font-medium mt-1">Get instant answers</p>
-            </div>
+            </button>
           </div>
         </section>
 
@@ -268,7 +288,12 @@ export default function CustomerHomePage() {
               <div className="p-10 text-center text-gray-400 font-medium">No recent bookings</div>
             ) : (
               recentBookings.map(b => (
-                <div key={b._id} role="button" tabIndex={0} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors cursor-pointer group" onClick={() => router.push('/customer/bookings')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') router.push('/customer/bookings'); }}>
+                <button 
+                  type="button"
+                  key={b._id} 
+                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors group text-left border-b border-gray-50 last:border-0" 
+                  onClick={() => router.push('/customer/bookings')}
+                >
                   <div className="flex items-center gap-4">
                     <div className="size-10 bg-blue-50/50 rounded-full flex items-center justify-center shrink-0 border border-blue-100/50 group-hover:bg-blue-50 transition-colors">
                       <MapPin size={16} className="text-[#1e3d5a]" />
@@ -286,7 +311,7 @@ export default function CustomerHomePage() {
                       {b.status}
                     </div>
                   </div>
-                </div>
+                </button>
               ))
             )}
           </div>
@@ -296,8 +321,18 @@ export default function CustomerHomePage() {
 
       {/* ── Guide Modal ──────────────────────────────────────────────────────── */}
       {showGuide && (
-        <div role="presentation" className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in" onClick={() => setShowGuide(false)}>
-          <div role="dialog" aria-modal="true" className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative" onClick={e => e.stopPropagation()}>
+        <div 
+          className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in" 
+          onClick={() => setShowGuide(false)}
+          onKeyDown={e => e.key === 'Escape' && setShowGuide(false)}
+          role="presentation"
+        >
+          <div 
+            className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative" 
+            onClick={e => e.stopPropagation()}
+            onKeyDown={e => e.stopPropagation()}
+            role="presentation"
+          >
             <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-[#ee6b20] text-white p-4 rounded-full shadow-lg border-[6px] border-white">
               <Info className="size-8" />
             </div>

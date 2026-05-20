@@ -2,7 +2,7 @@ import { api } from '../lib/api';
 
 export const analyticsService = {
   async getDashboardStats() {
-    const res = await api.get('/analytics/overview');
+    const res = await api.get('/analytics/dashboard');
     return res.data;
   },
   async getOverview(params?: { locationId?: string; startDate?: string; endDate?: string }) {

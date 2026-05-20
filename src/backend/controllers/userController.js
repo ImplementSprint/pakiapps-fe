@@ -80,21 +80,46 @@ const updateProfile = async (req, res) => {
     const user = await findUserById(req.user.id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    const allowed = ['name', 'phone', 'address', 'dateOfBirth', 'profilePicture', 'preferences'];
+    const allowed = ['firstName', 'lastName', 'email', 'phone', 'address', 'dateOfBirth', 'profilePicture', 'preferences'];
     const updates = {};
     allowed.forEach((k) => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
 
     const merged = { ...user, ...updates };
     updates.isVerified = shouldBeVerified(merged);
 
+    // If adding/changing email: validate format and check uniqueness
+    if (updates.email) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(updates.email)) {
+        return res.status(400).json({ success: false, message: 'Invalid email format.' });
+      }
+      const { sequelize } = require('../config/db');
+      const [taken] = await sequelize.query(
+        `SELECT id FROM public.users WHERE email = :email AND id != :selfId LIMIT 1`,
+        { replacements: { email: updates.email, selfId: req.user.id } }
+      );
+      if (taken.length > 0) {
+        return res.status(409).json({ success: false, message: 'This email is already used by another account.' });
+      }
+    }
+
     const updated = await updateUserById(req.user.id, updates);
 
     // Also update name in Supabase auth.users metadata so it stays in sync
-    if (updates.name && req.user.authId) {
+    if ((updates.firstName || updates.lastName) && req.user.authId) {
+      const fn = updates.firstName ?? user.firstName ?? '';
+      const ln = updates.lastName  ?? user.lastName  ?? '';
       await getSupabaseClient()
         .auth.admin.updateUserById(req.user.authId, {
-          user_metadata: { name: updates.name },
+          user_metadata: { firstName: fn, lastName: ln, name: `${fn} ${ln}`.trim() },
         })
+        .catch(() => null); // non-fatal
+    }
+
+    // If a phone-only user is adding their email for the first time,
+    // update Supabase auth so they can also log in with email+password later.
+    if (updates.email && req.user.authId && !user.email) {
+      await getSupabaseClient()
+        .auth.admin.updateUserById(req.user.authId, { email: updates.email })
         .catch(() => null); // non-fatal
     }
 

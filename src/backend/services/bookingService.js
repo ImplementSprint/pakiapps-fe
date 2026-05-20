@@ -63,7 +63,7 @@ const autoAssignSlot = async (locationId, date, timeSlot, preferredFloor = null)
   const conflictingIds = await getConflictingSlotIds(locationId, date, timeSlot);
 
   const where = {
-    locationId: parseInt(locationId),
+    locationId: locationId,
     status:     { [Op.notIn]: ['maintenance'] },
   };
   if (preferredFloor) where.floor = parseInt(preferredFloor);
@@ -88,14 +88,14 @@ const createBooking = async ({
   if (paymentMethod === 'gcash_linked' && savedPaymentMethodId) {
     const { PaymentMethod } = require('../models/index');
     const method = await PaymentMethod.findOne({
-      where: { id: savedPaymentMethodId, userId: parseInt(userId) }
+      where: { id: savedPaymentMethodId, userId }
     });
     if (!method) throw new Error('Invalid or missing saved payment method');
     // We snapshot the mobile number into the payment status or just keep it as gcash_linked
     finalPaymentMethod = `GCash (${method.mobileNumber})`;
   }
   // ── 1. Resolve slot (auto-assign or validate provided slot) ───────────────
-  let resolvedSlotId = parkingSlotId ? parseInt(parkingSlotId) : null;
+  let resolvedSlotId = parkingSlotId || null;
   let resolvedSpot   = spot;
 
   if (!resolvedSlotId) {
@@ -125,9 +125,9 @@ const createBooking = async ({
 
   // ── 3. Fetch snapshots in parallel (3 lightweight PK lookups) ─────────────
   const [user, vehicle, location] = await Promise.all([
-    User.findByPk(parseInt(userId),     { attributes: ['id', 'name', 'email', 'phone', 'discountPct'] }),
+    User.findOne({ where: { supabaseId: userId }, attributes: ['id', 'name', 'email', 'phone', 'discountPct'] }),
     Vehicle.findByPk(parseInt(vehicleId), { attributes: ['id', 'brand', 'model', 'plateNumber', 'type', 'color'] }),
-    Location.findByPk(parseInt(locationId), { attributes: ['id', 'name', 'address'] }),
+    Location.findByPk(locationId, { attributes: ['id', 'name', 'address'] }),
   ]);
 
   // ── 3b. Apply special discount (PWD / Senior Citizen — 20% off) ───────────
@@ -137,17 +137,19 @@ const createBooking = async ({
     : amount;
 
   // ── 4. Create booking with all snapshot data inline ───────────────────────
+  const isOnlinePayment = paymentMethod === 'GCash' || paymentMethod === 'Maya';
+  
   const booking = await Booking.create({
-    userId:        parseInt(userId),
+    userId:        userId,
     vehicleId:     parseInt(vehicleId),
-    locationId:    parseInt(locationId),
+    locationId:    locationId,
     parkingSlotId: resolvedSlotId,
     spot:          resolvedSpot,
     date,
     timeSlot,
     amount:        finalAmount,
     paymentMethod: finalPaymentMethod,
-    paymentStatus: 'paid',
+    paymentStatus: isOnlinePayment ? 'pending' : 'paid',
     status:        'upcoming',
 
     // User snapshot
@@ -167,17 +169,46 @@ const createBooking = async ({
     locationAddress: location?.address || null,
   });
 
+  let checkoutUrl = null;
+  let sessionId = null;
+
+  if (isOnlinePayment) {
+    try {
+      const paymentService = require('./paymentService');
+      const session = await paymentService.createCheckoutSession({
+        amount: finalAmount,
+        referenceId: booking.reference, // Hook automatically runs and populates reference!
+        description: `PakiPark Reservation - Spot ${resolvedSpot}`,
+        method: paymentMethod, // 'GCash' or 'Maya'
+        successUrl: `${process.env.CLIENT_URL || 'http://localhost:3000'}/customer/book?reference=${booking.reference}&step=receipt`,
+        cancelUrl: `${process.env.CLIENT_URL || 'http://localhost:3000'}/customer/book`
+      });
+
+      checkoutUrl = session.checkoutUrl;
+      sessionId = session.sessionId;
+
+      // Persist the paymentSessionId in database
+      await booking.update({ paymentSessionId: sessionId });
+    } catch (payErr) {
+      console.error('[BookingService] Failed to create checkout session:', payErr.message);
+    }
+  }
+
   // ── 5. Decrement available-spots counter ───────────────────────────────────
   await Location.decrement('availableSpots', { by: 1, where: { id: locationId } });
 
   const plain    = booking.toJSON();
   const formatted = formatBooking(plain);
+  if (checkoutUrl) {
+    formatted.checkoutUrl = checkoutUrl;
+    formatted.paymentSessionId = sessionId;
+  }
 
   // ── 6. Fire-and-forget: transaction log + activity ─────────────────────────
   logBookingCreated({ booking: { ...formatted, id: booking.id }, userId });
 
   // ── 7. Fire-and-forget: in-app notification ───────────────────────────────
-  notificationService.notifyBookingConfirmed(parseInt(userId), {
+  notificationService.notifyBookingConfirmed(userId, {
     ...formatted,
     id:           booking.id,
     spot:         resolvedSpot,
@@ -251,9 +282,20 @@ const updateBookingStatus = async (bookingId, status, cancelNote = 'Admin action
 // ─────────────────────────────────────────────────────────────────────────────
 // getUserBookings  (customer)
 // ─────────────────────────────────────────────────────────────────────────────
-const getUserBookings = async (userId, { status, page = 1, limit = 20 }) => {
-  const where = { userId: parseInt(userId) };
+const getUserBookings = async (userId, { status, search, page = 1, limit = 20 }) => {
+  const where = { userId };
   if (status && status !== 'all') where.status = status;
+
+  if (search) {
+    const { Op } = require('sequelize');
+    const term = `%${search}%`;
+    where[Op.or] = [
+      { reference:    { [Op.iLike]: term } },
+      { barcode:      { [Op.iLike]: term } },
+      { vehiclePlate: { [Op.iLike]: term } },
+      { locationName: { [Op.iLike]: term } },
+    ];
+  }
 
   const { rows: bookings, count: total } = await Booking.findAndCountAll({
     where,
@@ -262,6 +304,26 @@ const getUserBookings = async (userId, { status, page = 1, limit = 20 }) => {
     offset:   (parseInt(page) - 1) * parseInt(limit),
     raw:      true,
   });
+
+  // Sync payment status dynamically for any pending bookings returned
+  try {
+    const paymentService = require('./paymentService');
+    for (const b of bookings) {
+      if (b.paymentStatus === 'pending' && b.paymentSessionId) {
+        try {
+          const realStatus = await paymentService.getPaymentStatus(b.paymentSessionId);
+          if (realStatus.status === 'paid') {
+            await Booking.update({ paymentStatus: 'paid' }, { where: { id: b.id } });
+            b.paymentStatus = 'paid';
+          }
+        } catch (err) {
+          console.warn('[SyncPaymentList] Failed to sync status:', err.message);
+        }
+      }
+    }
+  } catch (syncErr) {
+    console.warn('[SyncPaymentOuter] Failed to load payment service:', syncErr.message);
+  }
 
   return {
     bookings:   bookings.map(formatBooking),
@@ -272,15 +334,23 @@ const getUserBookings = async (userId, { status, page = 1, limit = 20 }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// getAllBookings  (admin / teller — date, locationId, status filters)
+// getAllBookings  (admin / teller / business_partner — date, locationId, status filters)
 // ─────────────────────────────────────────────────────────────────────────────
-const getAllBookings = async ({ status, search, date, locationId, page = 1, limit = 20 }) => {
+const getAllBookings = async ({ status, search, date, locationId, hubIds, page = 1, limit = 20 }) => {
   const where = {};
-  if (status     && status !== 'all') where.status     = status;
-  if (date)       where.date       = date;
-  if (locationId) where.locationId = parseInt(locationId);
+  if (status && status !== 'all') where.status = status;
+  if (date) where.date = date;
 
-  // Search across reference, userName, vehiclePlate (all on the booking row — no JOIN)
+  // hubIds is a UUID[] injected by the controller after getScopedHubIds()
+  // Sequelize field alias 'locationId' maps to DB column 'location_id'
+  if (hubIds && hubIds.length > 0) {
+    where.locationId = { [Op.in]: hubIds };
+  } else if (locationId) {
+    // Admin passing explicit locationId filter (single UUID string)
+    where.locationId = locationId;
+  }
+
+  // Search across snapshot columns on the booking row — no JOIN needed
   if (search) {
     const term = `%${search}%`;
     where[Op.or] = [
@@ -308,6 +378,7 @@ const getAllBookings = async ({ status, search, date, locationId, page = 1, limi
     totalPages: Math.ceil(total / parseInt(limit)),
   };
 };
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // cancelBooking  (customer self-cancel)

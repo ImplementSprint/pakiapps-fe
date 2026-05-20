@@ -2,10 +2,12 @@
 /**
  * Notification model
  * ==================
- * Stores every in-app notification for a user.
- * Types: booking_confirmed | booking_cancelled | booking_reminder |
- *        no_show | discount_approved | discount_rejected |
- *        registration_rejected | system
+ * Aligned with account.customer_notifications (NOT public.notifications).
+ * userId is UUID (account.profiles.id / Supabase auth id).
+ *
+ * Column mapping:
+ *   public.notifications.body  → account.customer_notifications.message
+ *   public.notifications.isRead → account.customer_notifications.is_read
  */
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
@@ -13,36 +15,23 @@ const { sequelize } = require('../config/db');
 const Notification = sequelize.define(
   'Notification',
   {
-    id:         { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    userId:     { type: DataTypes.INTEGER, allowNull: false },
-    type: {
-      type: DataTypes.ENUM(
-        'booking_confirmed',
-        'booking_cancelled',
-        'booking_reminder',
-        'no_show',
-        'discount_approved',
-        'discount_rejected',
-        'registration_rejected',
-        'system'
-      ),
-      allowNull: false,
-    },
-    title:      { type: DataTypes.STRING(200), allowNull: false },
-    body:       { type: DataTypes.TEXT,        allowNull: false },
-    isRead:     { type: DataTypes.BOOLEAN,     defaultValue: false },
-    entityType: { type: DataTypes.STRING(50),  defaultValue: null },  // 'Booking' | 'User' | ...
-    entityId:   { type: DataTypes.INTEGER,     defaultValue: null },  // related row ID
+    id:     { type: DataTypes.UUID,    primaryKey: true, defaultValue: DataTypes.UUIDV4 },
+    userId: { type: DataTypes.UUID,    allowNull: false, field: 'user_id' },
+    type:   { type: DataTypes.STRING(80), allowNull: false },
+    title:  { type: DataTypes.STRING(200), allowNull: false },
+    // 'message' is the actual DB column name; 'body' kept as alias for backward compat
+    message: { type: DataTypes.TEXT,    allowNull: false },
+    isRead:  { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_read' },
   },
   {
-    tableName:  'notifications',
-    schema: 'public',
+    tableName:  'customer_notifications',
+    schema:     'account',         // ← account schema (NO public)
     timestamps: true,
+    createdAt:  'created_at',
+    updatedAt:  false,
     indexes: [
-      // Primary read path: user's unread notifications (bell badge count)
-      { name: 'idx_notifications_user_read', fields: ['userId', 'isRead'] },
-      // List notifications for a user, newest first
-      { name: 'idx_notifications_user_createdat', fields: ['userId', 'createdAt'] },
+      { name: 'idx_acct_notif_user_read',      fields: ['user_id', 'is_read'] },
+      { name: 'idx_acct_notif_user_createdat', fields: ['user_id', 'created_at'] },
     ],
   }
 );
@@ -50,6 +39,8 @@ const Notification = sequelize.define(
 Notification.prototype.toJSON = function () {
   const v = Object.assign({}, this.get());
   v._id = String(v.id);
+  // Backward compat alias
+  v.body = v.message;
   return v;
 };
 

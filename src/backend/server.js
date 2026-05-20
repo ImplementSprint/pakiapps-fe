@@ -46,10 +46,18 @@ app.use('/api/uploads',           require('./routes/uploadRoutes'));
 app.use('/api/notifications',     require('./routes/notificationRoutes'));
 app.use('/api/payment-methods',   require('./routes/paymentMethodRoutes'));   // SCRUM-1014
 app.use('/api/operating-hours',   require('./routes/operatingHoursRoutes')); // Partner Hours
+app.use('/api/payment',           require('./routes/paymentRoutes'));         // API Center Payment Gateway
 
 // ── Health check ──────────────────────────────────────────────────────────────
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', db: 'postgresql', timestamp: new Date().toISOString() });
+app.get('/api/health', async (req, res) => {
+  const apiCenter = require('./config/apiCenterClient');
+  const apiCenterOnline = await apiCenter.ping().catch(() => false);
+  res.json({
+    status:        'ok',
+    db:            'postgresql',
+    apiCenter:     apiCenterOnline ? 'connected' : 'degraded',
+    timestamp:     new Date().toISOString(),
+  });
 });
 
 // ── Global error handler ──────────────────────────────────────────────────────

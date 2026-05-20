@@ -409,6 +409,7 @@ interface SlotButtonProps {
   vc: ReturnType<typeof getVisualConfig>;
   timing: BookingTiming | null;
   walkIn: any;
+  // eslint-disable-next-line no-unused-vars
   onSelect: (g: GridSlot) => void;
 }
 function SlotButton({ g, visual, vc, timing, walkIn, onSelect }: Readonly<SlotButtonProps>) {
@@ -432,7 +433,7 @@ function SlotButton({ g, visual, vc, timing, walkIn, onSelect }: Readonly<SlotBu
       )}
       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-2 bg-[#1e3d5a] text-white text-[10px] rounded-xl shadow-xl whitespace-nowrap z-20 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
         <p className="font-bold">{g.dbSlot.label} · {g.category}</p>
-        <p className="text-white/60 capitalize">{visual.replace('_',' ')}</p>
+        <p className="text-white/60 capitalize">{visual.replace('_', ' ')}</p>
         {g.dbSlot.booking?.vehicle?.plateNumber && <p className="text-[#ee6b20] font-bold mt-0.5">{g.dbSlot.booking.vehicle.plateNumber}</p>}
         {timing?.isInGracePeriod && <p className="text-orange-300">Grace: {timing.gracePeriodMinLeft}m left</p>}
         {timing?.isOverstay && <p className="text-rose-300">Overstay: +{timing.overstayMinutes}m</p>}
@@ -532,9 +533,12 @@ export function SmartParkingDashboard() {
   useEffect(() => {
     locationService.getLocations({ status: 'active' }).then((data) => {
       setLocations(data);
-      if (!selectedLocationId && data.length > 0) {
-        setSelectedLocationId(data[0]._id);
-        localStorage.setItem('adminSelectedLocationId', data[0]._id);
+      if (data.length > 0) {
+        const isValid = data.some((loc: any) => loc._id === selectedLocationId);
+        if (!selectedLocationId || !isValid) {
+          setSelectedLocationId(data[0]._id);
+          localStorage.setItem('adminSelectedLocationId', data[0]._id);
+        }
       }
     }).catch(() => { });
   }, []);
@@ -787,7 +791,7 @@ export function SmartParkingDashboard() {
                   const timing = getTiming(g);
                   const walkIn = walkIns[slotKey(g)];
                   const visual = resolveVisualState(g.dbSlot, timing, walkIn);
-                  const vc     = getVisualConfig(visual);
+                  const vc = getVisualConfig(visual);
                   return (
                     <SlotButton
                       key={g.dbSlot._id}
@@ -818,26 +822,7 @@ export function SmartParkingDashboard() {
           </p>
         </div>
 
-        {/* Location selector */}
-        <div className="relative">
-          <button onClick={() => setShowLocDrop(!showLocDrop)}
-            className="flex items-center gap-2 bg-white border-2 border-gray-200 hover:border-[#ee6b20] rounded-2xl px-4 py-2.5 font-bold text-[#1e3d5a] transition-all min-w-[220px]">
-            <MapPin className="size-4 text-[#ee6b20] shrink-0" />
-            <span className="flex-1 text-left text-sm truncate">{selectedLocation?.name || 'Select Location'}</span>
-            <ChevronDown className={`size-4 text-gray-400 transition-transform ${showLocDrop ? 'rotate-180' : ''}`} />
-          </button>
-          {showLocDrop && locations.length > 0 && (
-            <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-xl border z-50 overflow-hidden">
-              {locations.map(loc => (
-                <button key={loc._id} onClick={() => { setSelectedLocationId(loc._id); localStorage.setItem('adminSelectedLocationId', loc._id); setShowLocDrop(false); }}
-                  className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-orange-50 text-left transition-colors ${selectedLocationId === loc._id ? 'bg-orange-50' : ''}`}>
-                  <MapPin className="size-4 text-[#ee6b20] mt-0.5 shrink-0" />
-                  <div><p className="font-bold text-[#1e3d5a] text-sm">{loc.name}</p><p className="text-xs text-gray-400">{loc.address}</p></div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+
       </div>
 
       {/* Controls bar */}
@@ -889,6 +874,7 @@ export function SmartParkingDashboard() {
         </div>
         {selectedLocation && (
           <div className="flex flex-wrap gap-4 text-xs text-gray-400 pt-3 border-t border-gray-100">
+            <span className="flex items-center gap-1 font-bold text-[#1e3d5a]"><MapPin className="size-3" />{selectedLocation.name}</span>
             <span className="flex items-center gap-1"><MapPin className="size-3" />{selectedLocation.address}</span>
             <span className="flex items-center gap-1"><Car className="size-3" />{selectedLocation.availableSpots}/{selectedLocation.totalSpots} available</span>
             <span className="flex items-center gap-1"><Clock className="size-3" />{getOperatingHoursLabel(selectedLocation.operatingHours)}</span>
@@ -961,12 +947,12 @@ export function SmartParkingDashboard() {
           aria-labelledby="pricing-modal-title"
           className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm m-0 max-w-none w-full h-full border-none bg-transparent"
         >
-          <button 
-            type="button" 
-            className="absolute inset-0 w-full h-full cursor-default bg-transparent border-none outline-none" 
-            aria-label="Close modal" 
-            onClick={() => setShowPricingModal(false)} 
-            tabIndex={-1} 
+          <button
+            type="button"
+            className="absolute inset-0 w-full h-full cursor-default bg-transparent border-none outline-none"
+            aria-label="Close modal"
+            onClick={() => setShowPricingModal(false)}
+            tabIndex={-1}
           />
           <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8 relative z-10">
             <div className="flex items-center justify-between mb-6">
@@ -1065,12 +1051,12 @@ export function SmartParkingDashboard() {
           aria-label="Slot Details"
           className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm m-0 max-w-none w-full h-full border-none bg-transparent"
         >
-          <button 
-            type="button" 
-            className="absolute inset-0 w-full h-full cursor-default bg-transparent border-none outline-none" 
-            aria-label="Close modal" 
-            onClick={() => setShowModal(false)} 
-            tabIndex={-1} 
+          <button
+            type="button"
+            className="absolute inset-0 w-full h-full cursor-default bg-transparent border-none outline-none"
+            aria-label="Close modal"
+            onClick={() => setShowModal(false)}
+            tabIndex={-1}
           />
           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto relative z-10">
             <div className="p-6 relative">{renderModalContent()}</div>

@@ -2,47 +2,50 @@ const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
 
 /**
- * Location — parking facility.
- * Aligned with public.locations schema.
+ * Location — maps to parking_lot.locations (the canonical establishment table).
+ *
+ * Schema: parking_lot
+ * Primary key: UUID (id)
+ * Owner link: partner_user_id UUID → account.users.supabaseId
+ *
+ * This replaces the old public.locations and routing.operator_hubs mappings.
  */
 const Location = sequelize.define(
   'Location',
   {
     id: {
-      type: DataTypes.INTEGER,
+      type:       DataTypes.UUID,
       primaryKey: true,
-      autoIncrement: true,
+      defaultValue: DataTypes.UUIDV4,
     },
-    name:    { type: DataTypes.STRING,  allowNull: false },
-    address: { type: DataTypes.STRING,  allowNull: false },
-    lat:     { type: DataTypes.FLOAT,   allowNull: true },
-    lng:     { type: DataTypes.FLOAT,   allowNull: true },
-    totalSpots:     { type: DataTypes.INTEGER, defaultValue: 100 },
-    availableSpots: { type: DataTypes.INTEGER, defaultValue: 100 },
-    hourlyRate:     { type: DataTypes.FLOAT,   defaultValue: 50 },
-    status: {
-      type: DataTypes.ENUM('active', 'inactive', 'maintenance'),
-      defaultValue: 'active',
-    },
-    operatingHours: { type: DataTypes.JSONB, defaultValue: {} },
-    amenities:      { type: DataTypes.ARRAY(DataTypes.TEXT), defaultValue: [] },
-    partnerId:      { type: DataTypes.INTEGER, allowNull: true },
-    operatingHoursJson: { type: DataTypes.JSONB, allowNull: true },
+    // FK to account.users.supabaseId — identifies the Business Partner owner
+    partner_user_id: { type: DataTypes.UUID, allowNull: true },
+    name:          { type: DataTypes.STRING, allowNull: false },
+    address:       { type: DataTypes.STRING, allowNull: false },
+    lat:           { type: DataTypes.FLOAT,  allowNull: true },
+    lng:           { type: DataTypes.FLOAT,  allowNull: true },
+    amenities:     { type: DataTypes.ARRAY(DataTypes.STRING), allowNull: true },
+    totalSpots:    { type: DataTypes.INTEGER, defaultValue: 0 },
+    availableSpots:{ type: DataTypes.INTEGER, defaultValue: 0 },
+    hourlyRate:    { type: DataTypes.FLOAT, defaultValue: 0 }, // still denormalized here for easy reads, but also managed in parking_rates
+    status:        { type: DataTypes.STRING, defaultValue: 'active' },
+    operatingHours:{ type: DataTypes.JSONB, allowNull: true },
+    operatingHoursJson:{ type: DataTypes.JSONB, allowNull: true },
+    createdAt:     { type: DataTypes.DATE, allowNull: true },
+    updatedAt:     { type: DataTypes.DATE, allowNull: true }
   },
   {
-    tableName: 'locations',
-    schema: 'public',
+    tableName:  'locations',
+    schema:     'parking_lot',
     timestamps: true,
-    indexes: [
-      { name: 'idx_locations_status',  fields: ['status'] },
-      { name: 'idx_locations_partner', fields: ['partnerId'] },
-    ],
   }
 );
 
 Location.prototype.toJSON = function () {
-  const v = Object.assign({}, this.get());
-  v._id = String(v.id);
+  const v = { ...this.get() };
+  v._id      = String(v.id);
+  v.hourlyRate    = v.hourlyRate    ?? 0;
+  v.availableSpots = v.availableSpots ?? v.totalSpots;
   return v;
 };
 

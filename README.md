@@ -91,3 +91,65 @@ Open [http://localhost:3000](http://localhost:3000)
 - [x] Sequelize Database Synchronization
 
 ---
+
+## 🛠️ FE Multi Template Repo Starter
+
+This repository is configured as a multi-app monorepo that integrates with the central FE Multi pipeline.
+
+### 📦 Included Apps
+- **system-1-web**: Next.js 16, TypeScript, ESLint, Jest, Docker.
+- **system-2-web**: Next.js 16, TypeScript, ESLint, Jest, Docker.
+- **system-3-web**: Next.js 16, TypeScript, ESLint, Jest, Docker.
+
+### ⚙️ CI/CD Configuration
+
+The central pipeline (`.github/workflows/master-pipeline-fe-multi.yml`) requires the following repository variables and secrets:
+
+#### Repository Variables
+- `FE_MULTI_SYSTEMS_JSON`: JSON configuration for the apps to build and deploy.
+  Example:
+  ```json
+  [
+    {
+      "name": "System 1",
+      "dir": "system-1-web",
+      "image": "system-1-web",
+      "vercel_project_secret": "VERCEL_PROJECT_ID_SYSTEM_1"
+    },
+    {
+      "name": "System 2",
+      "dir": "system-2-web",
+      "image": "system-2-web",
+      "vercel_project_secret": "VERCEL_PROJECT_ID_SYSTEM_2"
+    },
+    {
+      "name": "System 3",
+      "dir": "system-3-web",
+      "image": "system-3-web",
+      "vercel_project_secret": "VERCEL_PROJECT_ID_SYSTEM_3"
+    }
+  ]
+  ```
+
+#### Required Secrets
+- `VERCEL_TOKEN`
+- `VERCEL_ORG_ID`
+- `VERCEL_PROJECT_ID_SYSTEM_1`
+- `VERCEL_PROJECT_ID_SYSTEM_2`
+- `VERCEL_PROJECT_ID_SYSTEM_3`
+- `SONAR_TOKEN`
+- `SONAR_ORGANIZATION`
+- `SONAR_PROJECT_KEY`
+- `SLACK_WEBHOOK_URL`
+- `DISCORD_WEBHOOK_URL`
+
+### 🧪 Local Check
+
+To verify an app locally, run:
+```bash
+cd system-1-web && npm install && npm run lint && npm run test && npm run build
+```
+
+---
+
+*PakiPark · Built for CCDI Capstone · 2026*

@@ -2,47 +2,31 @@ const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
 
 /**
- * TransactionLog — aligned with public.transaction_logs (integer IDs, camelCase).
+ * TransactionLog — aligned with reservation.transaction_logs (NOT public).
  * Immutable — append-only, no updates.
+ * bookingId/userId are UUID (reservation.bookings uses integer id, but
+ * reservation.transaction_logs uses UUID for booking_id and user_id per schema).
  */
 const TransactionLog = sequelize.define(
   'TransactionLog',
   {
-    id:        { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    bookingId: { type: DataTypes.INTEGER, allowNull: true },
-    userId:    { type: DataTypes.INTEGER, allowNull: true },
-    reference: { type: DataTypes.STRING(30), allowNull: true },
-
-    transactionType: {
-      type: DataTypes.ENUM('payment', 'refund', 'partial_refund', 'reversal', 'adjustment'),
-      allowNull: false,
-      defaultValue: 'payment',
-    },
-    paymentMethod: {
-      type: DataTypes.ENUM('GCash', 'PayMaya', 'Credit/Debit Card', 'Cash', 'System'),
-      allowNull: false,
-    },
-    amount:   { type: DataTypes.FLOAT,     allowNull: false },
-    currency: { type: DataTypes.STRING(5), allowNull: false, defaultValue: 'PHP' },
-    status: {
-      type: DataTypes.ENUM('success', 'failed', 'pending', 'refunded'),
-      allowNull: false,
-      defaultValue: 'success',
-    },
-    description: { type: DataTypes.TEXT, allowNull: true },
-    metadata:    { type: DataTypes.JSONB, defaultValue: {} },
+    id:        { type: DataTypes.UUID,    primaryKey: true, defaultValue: DataTypes.UUIDV4 },
+    bookingId: { type: DataTypes.UUID,    allowNull: true,  field: 'booking_id' },
+    userId:    { type: DataTypes.UUID,    allowNull: true,  field: 'user_id' },
+    type:      { type: DataTypes.STRING(50), allowNull: false, defaultValue: 'payment' },
+    amount:    { type: DataTypes.FLOAT,   allowNull: false },
+    details:   { type: DataTypes.JSONB,   defaultValue: {} },
   },
   {
-    tableName: 'transaction_logs',
-    schema: 'public',
+    tableName:  'transaction_logs',
+    schema:     'reservation',     // ← reservation schema (NO public)
     timestamps: true,
-    updatedAt: false,
+    createdAt:  'created_at',
+    updatedAt:  'updated_at',
     indexes: [
-      { name: 'idx_txlogs_booking',   fields: ['bookingId'] },
-      { name: 'idx_txlogs_user',      fields: ['userId'] },
-      { name: 'idx_txlogs_reference', fields: ['reference'] },
-      { name: 'idx_txlogs_type',      fields: ['transactionType'] },
-      { name: 'idx_txlogs_status',    fields: ['status'] },
+      { name: 'idx_res_txlogs_booking', fields: ['booking_id'] },
+      { name: 'idx_res_txlogs_user',    fields: ['user_id'] },
+      { name: 'idx_res_txlogs_type',    fields: ['type'] },
     ],
   }
 );

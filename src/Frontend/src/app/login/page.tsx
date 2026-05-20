@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
   Phone, Mail, Eye, EyeOff, Zap, Shield, Clock,
-  ChevronLeft, Check, X, ArrowRight, ShieldCheck, Lock,
+  ChevronLeft, Check, X, ArrowRight, ShieldCheck, Lock, Smartphone, RefreshCw, KeyRound,
 } from 'lucide-react';
 import { authService } from '@/services/authService';
+import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
 function navigateByRole(role: string, push: (p: string) => void) {
@@ -25,19 +26,105 @@ export default function LoginPage() {
   const [formData, setFormData]           = useState({ identifier: '', password: '' });
   const [errors, setErrors]               = useState({ identifier: '', password: '' });
   const [showForgotModal, setShowForgotModal] = useState(false);
-  const [forgotIdentifier, setForgotIdentifier] = useState('');
-  const [resetSent, setResetSent]         = useState(false);
+  // Forgot-password multi-step state
+  const [fpStep, setFpStep]         = useState<1|2|3>(1);
+  const [fpMode, setFpMode]         = useState<'email'|'sms'>('email'); // NEW: email or sms
+  const [fpIdentifier, setFpIdentifier] = useState(''); // email or phone digits
+  const [fpOtp, setFpOtp]           = useState('');
+  const [fpNewPw, setFpNewPw]       = useState('');
+  const [fpConfirm, setFpConfirm]   = useState('');
+  const [fpShowPw, setFpShowPw]     = useState(false);
+  const [fpLoading, setFpLoading]   = useState(false);
+  const [fpError, setFpError]       = useState('');
+  const [fpCooldown, setFpCooldown] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval>|null>(null);
+
+  function closeForgot() {
+    setShowForgotModal(false);
+    setFpStep(1); setFpIdentifier(''); setFpOtp('');
+    setFpNewPw(''); setFpConfirm(''); setFpError('');
+  }
+
+  /** Canonical identifier to send to API */
+  function canonicalIdentifier() {
+    if (fpMode === 'email') return fpIdentifier.trim().toLowerCase();
+    // Phone: strip non-digits, normalize to +63XXXXXXXXXX
+    let d = fpIdentifier.replace(/\D/g, '');
+    if (d.startsWith('63')) d = d.slice(2);
+    if (d.startsWith('0'))  d = d.slice(1);
+    return `+63${d}`;
+  }
+
+  function smsReady() {
+    const d = fpIdentifier.replace(/\D/g, '').replace(/^(63|0)/, '');
+    return d.length === 10;
+  }
+  function emailReady() {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fpIdentifier.trim());
+  }
+  function step1Ready() { return fpMode === 'email' ? emailReady() : smsReady(); }
+
+  async function handleFpRequest() {
+    setFpError('');
+    if (!step1Ready()) {
+      setFpError(fpMode === 'email' ? 'Enter a valid email address.' : 'Enter a valid 10-digit PH mobile number.');
+      return;
+    }
+    setFpLoading(true);
+    try {
+      await api.post('/auth/forgot-password/request', { identifier: canonicalIdentifier() });
+      setFpStep(2);
+      startCooldown();
+    } catch (e: any) {
+      setFpError(e.response?.data?.message || e.message);
+    } finally { setFpLoading(false); }
+  }
+
+  function startCooldown(secs = 60) {
+    setFpCooldown(secs);
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
+    cooldownRef.current = setInterval(() => {
+      setFpCooldown(c => { if (c <= 1) { clearInterval(cooldownRef.current!); return 0; } return c - 1; });
+    }, 1000);
+  }
+
+  async function handleFpVerify() {
+    setFpError('');
+    if (fpOtp.length !== 6) { setFpError('Enter the 6-digit code.'); return; }
+    setFpLoading(true);
+    try {
+      await api.post('/auth/forgot-password/verify', { identifier: canonicalIdentifier(), otp: fpOtp });
+      setFpStep(3);
+    } catch (e: any) {
+      setFpError(e.response?.data?.message || e.message);
+    } finally { setFpLoading(false); }
+  }
+
+  async function handleFpReset() {
+    setFpError('');
+    if (fpNewPw.length < 8) { setFpError('Password must be at least 8 characters.'); return; }
+    if (fpNewPw !== fpConfirm) { setFpError("Passwords don't match."); return; }
+    setFpLoading(true);
+    try {
+      await api.post('/auth/forgot-password/reset', { identifier: canonicalIdentifier(), otp: fpOtp, newPassword: fpNewPw });
+      toast.success('Password reset! You can now log in.');
+      closeForgot();
+    } catch (e: any) {
+      setFpError(e.response?.data?.message || e.message);
+    } finally { setFpLoading(false); }
+  }
 
   const isPhone = /^\d/.test(formData.identifier) && !formData.identifier.includes('@');
 
   const handleIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     if (/^\d/.test(val) && !val.includes('@')) {
-      const digits = val.replace(/\D/g, '');
-      if (digits.length <= 10) {
-        setFormData({ ...formData, identifier: digits });
-        setErrors(prev => ({ ...prev, identifier: digits.length > 0 && digits.length < 10 ? 'Enter 10 digits for mobile number.' : '' }));
-      }
+      // Strip non-digits then remove leading 0 (PH users type 09XXXXXXXXX naturally)
+      let digits = val.replace(/\D/g, '');
+      if (digits.startsWith('0')) digits = digits.slice(1);
+      digits = digits.slice(0, 10);
+      setFormData({ ...formData, identifier: digits });
+      setErrors(prev => ({ ...prev, identifier: digits.length > 0 && digits.length < 10 ? 'Enter 10 digits for mobile number.' : '' }));
     } else {
       setFormData({ ...formData, identifier: val });
       setErrors(prev => ({ ...prev, identifier: '' }));
@@ -62,8 +149,10 @@ export default function LoginPage() {
 
     setIsLoading(true);
     try {
-      const email = isPhone ? `+63${formData.identifier}` : formData.identifier;
-      const user = await authService.login(email, formData.password);
+      const loginPayload = isPhone
+        ? `+63${formData.identifier}`  // backend loginUser handles phone lookup
+        : formData.identifier;
+      const user = await authService.login(loginPayload, formData.password);
       navigateByRole(user.role, router.push.bind(router));
     } catch (err: any) {
       setErrors(prev => ({ ...prev, password: err.message || 'Login failed. Please try again.' }));
@@ -170,24 +259,6 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <div className="mt-10 mb-8 relative">
-              <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-[#e2e8f0]" /></div>
-              <div className="relative flex justify-center text-[10px] font-bold uppercase tracking-widest text-[#8492a6]">
-                <span className="bg-white px-4">Or Connect With</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-10">
-              {[
-                { label: 'Google',   icon: <img src="https://www.google.com/favicon.ico" alt="G" className="size-4" /> },
-                { label: 'Facebook', icon: <img src="https://upload.wikimedia.org/wikipedia/commons/b/b9/2023_Facebook_icon.svg" alt="F" className="size-4" /> },
-                { label: 'PakiShip', icon: <Image src="/assets/d0a94c34a139434e20f5cb9888d8909dd214b9e7.png" alt="PS" width={20} height={20} className="h-5 object-contain" unoptimized /> },
-              ].map(s => (
-                <button key={s.label} className="h-14 rounded-2xl border border-[#e2e8f0] text-[#1e3d5a] font-bold text-xs flex items-center justify-center gap-2 hover:bg-[#f8fafc] transition-all active:scale-95">
-                  {s.icon} {s.label}
-                </button>
-              ))}
-            </div>
 
             <p className="text-center text-[#8492a6] font-bold text-sm">
               New to PakiPark? <Link href="/signup" className="text-[#ee6b20] hover:underline decoration-2 underline-offset-4">Create Account</Link>
@@ -200,24 +271,141 @@ export default function LoginPage() {
       {showForgotModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-[#1e3d5a]/40 backdrop-blur-sm">
           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 md:p-10 shadow-2xl relative">
-            <button onClick={() => { setShowForgotModal(false); setResetSent(false); }} className="absolute right-6 top-6 p-2 text-gray-300 hover:text-gray-500"><X className="w-5 h-5" /></button>
-            {!resetSent ? (
-              <div className="space-y-6">
-                <div className="w-14 h-14 bg-[#f4f7fa] rounded-2xl flex items-center justify-center"><Lock className="w-6 h-6 text-[#ee6b20]" /></div>
-                <div><h3 className="text-2xl font-bold text-[#1e3d5a]">Reset Password</h3><p className="text-[#8492a6] text-sm mt-1">Enter your email to receive a reset link.</p></div>
-                <input type="text" placeholder="your@email.com" value={forgotIdentifier} onChange={e => setForgotIdentifier(e.target.value)}
-                  className="h-14 w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-4 focus:outline-none focus:ring-2 focus:ring-[#1e3d5a]/20" suppressHydrationWarning />
-                <button onClick={() => setResetSent(true)} disabled={forgotIdentifier.length < 5}
-                  className="w-full h-14 bg-[#ee6b20] disabled:opacity-50 text-white font-bold rounded-xl flex items-center justify-center gap-2">
-                  Send Reset Link <ArrowRight className="w-4 h-4" />
+            <button onClick={closeForgot} className="absolute right-6 top-6 p-2 text-gray-300 hover:text-gray-500">
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Step indicator */}
+            <div className="flex items-center gap-2 mb-7">
+              {[1,2,3].map(s => (
+                <div key={s} className={`h-1.5 flex-1 rounded-full transition-all ${
+                  s <= fpStep ? 'bg-[#ee6b20]' : 'bg-gray-100'
+                }`} />
+              ))}
+            </div>
+
+            {/* ── Step 1: Email or Phone ── */}
+            {fpStep === 1 && (
+              <div className="space-y-5">
+                <div className="w-14 h-14 bg-[#fff3ed] rounded-2xl flex items-center justify-center">
+                  {fpMode === 'email' ? <Mail className="w-7 h-7 text-[#ee6b20]" /> : <Smartphone className="w-7 h-7 text-[#ee6b20]" />}
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-[#1e3d5a]">Reset Password</h3>
+                  <p className="text-[#8492a6] text-sm mt-1">
+                    {fpMode === 'email' ? "Enter your registered email. We'll send a 6-digit code." : "Enter your registered phone number. We'll send a 6-digit code via SMS."}
+                  </p>
+                </div>
+
+                {/* Mode toggle */}
+                <div className="flex gap-2 p-1 bg-[#f1f5f9] rounded-2xl">
+                  <button type="button" onClick={() => { setFpMode('email'); setFpIdentifier(''); setFpError(''); }}
+                    className={`flex-1 flex items-center justify-center gap-2 h-10 rounded-xl text-sm font-bold transition-all ${
+                      fpMode === 'email' ? 'bg-white shadow text-[#1e3d5a]' : 'text-gray-400 hover:text-gray-600'
+                    }`}>
+                    <Mail className="size-4" /> Email
+                  </button>
+                  <button type="button" onClick={() => { setFpMode('sms'); setFpIdentifier(''); setFpError(''); }}
+                    className={`flex-1 flex items-center justify-center gap-2 h-10 rounded-xl text-sm font-bold transition-all ${
+                      fpMode === 'sms' ? 'bg-white shadow text-[#1e3d5a]' : 'text-gray-400 hover:text-gray-600'
+                    }`}>
+                    <Phone className="size-4" /> SMS
+                  </button>
+                </div>
+
+                {/* Input */}
+                {fpMode === 'email' ? (
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-[#8492a6]" />
+                    <input type="email" placeholder="your@email.com"
+                      className="h-14 w-full pl-12 bg-[#f8fafc] border border-[#e2e8f0] rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3d5a]/20"
+                      value={fpIdentifier}
+                      onChange={e => setFpIdentifier(e.target.value)} />
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <div className="bg-[#f1f5f9] border border-[#e2e8f0] rounded-2xl px-4 flex items-center font-bold text-[#1e3d5a] text-sm flex-shrink-0">+63</div>
+                    <div className="relative flex-1">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-[#8492a6]" />
+                      <input type="text" inputMode="numeric" maxLength={10} placeholder="9XXXXXXXXX"
+                        className="h-14 w-full pl-12 bg-[#f8fafc] border border-[#e2e8f0] rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3d5a]/20"
+                        value={fpIdentifier}
+                        onChange={e => setFpIdentifier(e.target.value.replace(/\D/g,'').slice(0,10))} />
+                    </div>
+                  </div>
+                )}
+
+                {fpError && <p className="text-sm text-red-500 font-semibold">{fpError}</p>}
+                <button onClick={handleFpRequest} disabled={fpLoading || !step1Ready()}
+                  className="w-full h-14 bg-[#ee6b20] disabled:opacity-50 text-white font-bold rounded-2xl flex items-center justify-center gap-2 text-sm">
+                  {fpLoading ? 'Sending...' : <> Send Code <ArrowRight className="w-4 h-4" /> </>}
                 </button>
               </div>
-            ) : (
-              <div className="text-center py-4 space-y-4">
-                <div className="w-16 h-16 bg-[#ee6b20]/10 rounded-full flex items-center justify-center mx-auto"><ShieldCheck className="w-8 h-8 text-[#ee6b20]" /></div>
-                <h3 className="text-2xl font-bold text-[#1e3d5a]">Link Sent!</h3>
-                <p className="text-[#8492a6] text-sm font-medium">Check your inbox to reset your password.</p>
-                <button onClick={() => setShowForgotModal(false)} className="w-full h-14 bg-[#1e3d5a] text-white font-bold rounded-xl">Back to Login</button>
+            )}
+
+            {/* ── Step 2: OTP ── */}
+            {fpStep === 2 && (
+              <div className="space-y-5">
+                <div className="w-14 h-14 bg-[#fff3ed] rounded-2xl flex items-center justify-center">
+                  <KeyRound className="w-7 h-7 text-[#ee6b20]" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-[#1e3d5a]">Enter Code</h3>
+                  <p className="text-[#8492a6] text-sm mt-1">
+                    We sent a 6-digit code to{' '}
+                    <span className="font-bold text-[#1e3d5a]">
+                      {fpMode === 'email' ? fpIdentifier.trim() : `+63${fpIdentifier}`}
+                    </span>.
+                  </p>
+                </div>
+                <input type="text" inputMode="numeric" maxLength={6} placeholder="• • • • • •"
+                  className="h-16 w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-2xl text-center text-2xl font-bold tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-[#ee6b20]/30"
+                  value={fpOtp} onChange={e => setFpOtp(e.target.value.replace(/\D/g,'').slice(0,6))} />
+                {fpError && <p className="text-sm text-red-500 font-semibold">{fpError}</p>}
+                <button onClick={handleFpVerify} disabled={fpLoading || fpOtp.length !== 6}
+                  className="w-full h-14 bg-[#ee6b20] disabled:opacity-50 text-white font-bold rounded-2xl flex items-center justify-center gap-2 text-sm">
+                  {fpLoading ? 'Verifying...' : <> Verify Code <ArrowRight className="w-4 h-4" /> </>}
+                </button>
+                <button onClick={() => { if (fpCooldown === 0) { handleFpRequest(); } }}
+                  disabled={fpCooldown > 0}
+                  className="w-full flex items-center justify-center gap-2 text-xs font-bold text-[#8492a6] disabled:opacity-50 hover:text-[#1e3d5a] transition-colors">
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  {fpCooldown > 0 ? `Resend in ${fpCooldown}s` : 'Resend Code'}
+                </button>
+              </div>
+            )}
+
+            {/* ── Step 3: New Password ── */}
+            {fpStep === 3 && (
+              <div className="space-y-5">
+                <div className="w-14 h-14 bg-[#fff3ed] rounded-2xl flex items-center justify-center">
+                  <Lock className="w-7 h-7 text-[#ee6b20]" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-[#1e3d5a]">New Password</h3>
+                  <p className="text-[#8492a6] text-sm mt-1">Choose a strong password with 8+ characters.</p>
+                </div>
+                <div className="relative">
+                  <Shield className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-[#8492a6]" />
+                  <input type={fpShowPw ? 'text' : 'password'} placeholder="New password"
+                    className="h-14 w-full pl-12 pr-12 bg-[#f8fafc] border border-[#e2e8f0] rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3d5a]/20"
+                    value={fpNewPw} onChange={e => setFpNewPw(e.target.value)} />
+                  <button type="button" onClick={() => setFpShowPw(!fpShowPw)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[#8492a6]">
+                    {fpShowPw ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+                  </button>
+                </div>
+                <div className="relative">
+                  <Shield className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-[#8492a6]" />
+                  <input type={fpShowPw ? 'text' : 'password'} placeholder="Confirm new password"
+                    className="h-14 w-full pl-12 bg-[#f8fafc] border border-[#e2e8f0] rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3d5a]/20"
+                    value={fpConfirm} onChange={e => setFpConfirm(e.target.value)} />
+                </div>
+                {fpError && <p className="text-sm text-red-500 font-semibold">{fpError}</p>}
+                <button onClick={handleFpReset} disabled={fpLoading}
+                  className="w-full h-14 bg-[#1e3d5a] hover:bg-[#2a5373] disabled:opacity-50 text-white font-bold rounded-2xl flex items-center justify-center gap-2 text-sm">
+                  {fpLoading ? 'Saving...' : <><ShieldCheck className="w-4 h-4" /> Save New Password</>}
+                </button>
               </div>
             )}
           </div>

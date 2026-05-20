@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { locationsService } from '@/services/locationsService';
 import { api } from '@/lib/api';
-import { MapPin, Plus, Trash2, RefreshCw, Clock, X, Save, ChevronDown } from 'lucide-react';
+import { MapPin, Plus, Trash2, RefreshCw, Clock, X, Save, DollarSign, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -28,7 +28,7 @@ const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
 
 // ── Operating Hours Modal ──────────────────────────────────────────────────────
 function OperatingHoursModal({ location, onClose, onSaved }: {
-  location: any; onClose: () => void; onSaved: () => void;
+  readonly location: any; readonly onClose: () => void; readonly onSaved: () => void;
 }) {
   const [schedule, setSchedule] = useState<WeekSchedule>(() => {
     const raw = location.operatingHours;
@@ -40,11 +40,10 @@ function OperatingHoursModal({ location, onClose, onSaved }: {
   const set = (day: string, field: keyof DaySchedule, value: any) =>
     setSchedule(prev => ({ ...prev, [day]: { ...prev[day], [field]: value } }));
 
-  // Apply same hours to all days
   const applyAllDays = (src: string) => {
     const base = schedule[src];
     if (!base) return;
-    setSchedule(prev => Object.fromEntries(DAYS.map(d => [d.key, { ...base }])));
+    setSchedule(Object.fromEntries(DAYS.map(d => [d.key, { ...base }])));
     toast.success('Applied to all days');
   };
 
@@ -57,15 +56,12 @@ function OperatingHoursModal({ location, onClose, onSaved }: {
       onClose();
     } catch (err: any) {
       toast.error(err?.message || 'Could not save hours');
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   return (
-    <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        {/* Header */}
+    <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose} role="presentation">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()} role="presentation">
         <div className="flex items-center justify-between px-8 py-6 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="size-10 bg-[#1e3d5a]/10 rounded-xl flex items-center justify-center">
@@ -76,75 +72,45 @@ function OperatingHoursModal({ location, onClose, onSaved }: {
               <p className="text-xs text-gray-400">{location.name}</p>
             </div>
           </div>
-          <button onClick={onClose} className="size-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center">
-            <X className="size-4 text-gray-500" />
-          </button>
+          <button onClick={onClose} className="size-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"><X className="size-4 text-gray-500" /></button>
         </div>
-
-        {/* Body */}
         <div className="overflow-y-auto px-8 py-5 space-y-2 flex-1">
           {DAYS.map(({ key, label }) => {
             const day = schedule[key] ?? { open: '06:00', close: '23:00', closed: false };
             return (
-              <div key={key} className={`flex flex-wrap items-center gap-3 p-4 rounded-2xl border transition-all ${
-                day.closed ? 'bg-gray-50 border-gray-200 opacity-60' : 'bg-white border-gray-200 hover:border-[#1e3d5a]/30'
-              }`}>
-                {/* Day label */}
+              <div key={key} className={`flex flex-wrap items-center gap-3 p-4 rounded-2xl border transition-all ${day.closed ? 'bg-gray-50 border-gray-200 opacity-60' : 'bg-white border-gray-200 hover:border-[#1e3d5a]/30'}`}>
                 <span className="w-28 text-sm font-bold text-[#1e3d5a]">{label}</span>
-
-                {/* Closed toggle */}
                 <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <div
-                    onClick={() => set(key, 'closed', !day.closed)}
-                    className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 cursor-pointer ${
-                      day.closed ? 'bg-red-400' : 'bg-green-400'
-                    }`}
-                  >
+                  <button type="button" onClick={() => set(key, 'closed', !day.closed)}
+                    className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${day.closed ? 'bg-red-400' : 'bg-green-400'}`}
+                    aria-label={day.closed ? 'Open' : 'Close'}>
                     <div className={`size-4 bg-white rounded-full shadow transition-transform ${day.closed ? 'translate-x-0' : 'translate-x-4'}`} />
-                  </div>
-                  <span className={`text-xs font-bold ${day.closed ? 'text-red-500' : 'text-green-600'}`}>
-                    {day.closed ? 'Closed' : 'Open'}
-                  </span>
+                  </button>
+                  <span className={`text-xs font-bold ${day.closed ? 'text-red-500' : 'text-green-600'}`}>{day.closed ? 'Closed' : 'Open'}</span>
                 </label>
-
                 {!day.closed && (
                   <>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-400">From</span>
-                      <select
-                        value={day.open}
-                        onChange={e => set(key, 'open', e.target.value)}
-                        className="h-8 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3d5a]/20"
-                      >
+                      <select value={day.open} onChange={e => set(key, 'open', e.target.value)}
+                        className="h-8 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3d5a]/20">
                         {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
                       <span className="text-xs text-gray-400">To</span>
-                      <select
-                        value={day.close}
-                        onChange={e => set(key, 'close', e.target.value)}
-                        className="h-8 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3d5a]/20"
-                      >
+                      <select value={day.close} onChange={e => set(key, 'close', e.target.value)}
+                        className="h-8 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3d5a]/20">
                         {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
                     </div>
-                    <button
-                      onClick={() => applyAllDays(key)}
-                      className="ml-auto text-[10px] font-bold text-[#ee6b20] hover:underline whitespace-nowrap"
-                    >
-                      Apply to all ↓
-                    </button>
+                    <button onClick={() => applyAllDays(key)} className="ml-auto text-[10px] font-bold text-[#ee6b20] hover:underline whitespace-nowrap">Apply to all ↓</button>
                   </>
                 )}
               </div>
             );
           })}
         </div>
-
-        {/* Footer */}
         <div className="px-8 py-5 border-t border-gray-100 flex gap-3">
-          <button onClick={onClose} className="flex-1 h-12 border border-gray-200 text-gray-600 font-bold rounded-2xl hover:bg-gray-50 transition-colors">
-            Cancel
-          </button>
+          <button onClick={onClose} className="flex-1 h-12 border border-gray-200 text-gray-600 font-bold rounded-2xl hover:bg-gray-50 transition-colors">Cancel</button>
           <button onClick={handleSave} disabled={saving} className="flex-1 h-12 bg-[#1e3d5a] hover:bg-[#2a5373] text-white font-bold rounded-2xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
             {saving ? <RefreshCw className="size-4 animate-spin" /> : <Save className="size-4" />}
             {saving ? 'Saving…' : 'Save Hours'}
@@ -155,13 +121,94 @@ function OperatingHoursModal({ location, onClose, onSaved }: {
   );
 }
 
+// ── Pricing Modal ──────────────────────────────────────────────────────────────
+function PricingModal({ location, onClose, onSaved }: {
+  readonly location: any; readonly onClose: () => void; readonly onSaved: () => void;
+}) {
+  const [hourlyRate, setHourlyRate] = useState<string>(String(location.hourlyRate ?? 0));
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    const rate = parseFloat(hourlyRate);
+    if (isNaN(rate) || rate < 0) { toast.error('Enter a valid hourly rate (₱0 or more).'); return; }
+    setSaving(true);
+    try {
+      await api.patch(`/locations/${location.id}/price`, { hourlyRate: rate });
+      toast.success(`Hourly rate set to ₱${rate.toFixed(2)}`);
+      onSaved();
+      onClose();
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not update pricing');
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose} role="presentation">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8" onClick={e => e.stopPropagation()} role="presentation">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="size-12 bg-[#ee6b20]/10 rounded-2xl flex items-center justify-center">
+            <DollarSign className="size-6 text-[#ee6b20]" />
+          </div>
+          <div>
+            <h2 className="font-black text-[#1e3d5a] text-xl">Set Pricing</h2>
+            <p className="text-xs text-gray-400">{location.name}</p>
+          </div>
+          <button onClick={onClose} className="ml-auto size-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"><X className="size-4 text-gray-500" /></button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-1.5">Hourly Rate (₱)</label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">₱</span>
+              <input
+                type="number" min="0" step="0.50" value={hourlyRate}
+                onChange={e => setHourlyRate(e.target.value)}
+                className="w-full pl-8 pr-4 h-14 border border-gray-200 rounded-2xl text-lg font-bold focus:outline-none focus:ring-2 focus:ring-[#ee6b20]/30 focus:border-[#ee6b20]"
+              />
+            </div>
+            <p className="text-xs text-gray-400 mt-1">This rate will be shown to customers when booking at this location.</p>
+          </div>
+
+          <div className="bg-[#f8fafc] rounded-2xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp className="size-4 text-[#1e3d5a]" />
+              <span className="text-xs font-bold text-[#1e3d5a]">Pricing Preview</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              {[1, 2, 4].map(h => (
+                <div key={h} className="bg-white rounded-xl p-3 border border-gray-100">
+                  <div className="text-sm font-black text-[#1e3d5a]">₱{(parseFloat(hourlyRate || '0') * h).toFixed(0)}</div>
+                  <div className="text-[10px] text-gray-400">{h} hr{h > 1 ? 's' : ''}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <button onClick={onClose} className="flex-1 h-12 border border-gray-200 text-gray-600 font-bold rounded-2xl hover:bg-gray-50">Cancel</button>
+          <button onClick={handleSave} disabled={saving} className="flex-1 h-12 bg-[#ee6b20] hover:bg-[#d55f1c] text-white font-bold rounded-2xl flex items-center justify-center gap-2 disabled:opacity-60">
+            {saving ? <RefreshCw className="size-4 animate-spin" /> : <Save className="size-4" />}
+            {saving ? 'Saving…' : 'Save Pricing'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function AdminLocationsView() {
-  const [locations, setLocations]     = useState<any[]>([]);
-  const [isLoading, setIsLoading]     = useState(true);
-  const [showAdd, setShowAdd]         = useState(false);
-  const [form, setForm]               = useState({ name: '', address: '', totalSpots: '100' });
-  const [hoursModal, setHoursModal]   = useState<any | null>(null);
+  const role = typeof window !== 'undefined' ? (localStorage.getItem('userRole') ?? 'admin') : 'admin';
+  const isPartner = role === 'business_partner';
+
+  const [locations, setLocations]   = useState<any[]>([]);
+  const [isLoading, setIsLoading]   = useState(true);
+  const [showAdd, setShowAdd]       = useState(false);
+  const [form, setForm]             = useState({ name: '', address: '', totalSpots: '100' });
+  const [hoursModal, setHoursModal] = useState<any | null>(null);
+  const [priceModal, setPriceModal] = useState<any | null>(null);
 
   const load = async () => {
     setIsLoading(true);
@@ -199,18 +246,29 @@ export default function AdminLocationsView() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-[#1e3d5a]">Parking Locations</h2>
+        <div>
+          <h2 className="text-xl font-bold text-[#1e3d5a]">
+            {isPartner ? 'My Parking Location' : 'Parking Locations'}
+          </h2>
+          {isPartner && (
+            <p className="text-sm text-gray-400 mt-0.5">Manage your location's pricing and operating hours.</p>
+          )}
+        </div>
         <div className="flex gap-2">
           <button onClick={load} className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50">
             <RefreshCw className={`size-4 text-gray-500 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
-          <button onClick={() => setShowAdd(!showAdd)} className="flex items-center gap-2 px-4 py-2 bg-[#ee6b20] text-white rounded-xl text-sm font-bold">
-            <Plus className="size-4" />Add Location
-          </button>
+          {/* Admin only: Add Location button */}
+          {!isPartner && (
+            <button onClick={() => setShowAdd(!showAdd)} className="flex items-center gap-2 px-4 py-2 bg-[#ee6b20] text-white rounded-xl text-sm font-bold hover:bg-[#d55f1c] transition-colors">
+              <Plus className="size-4" />Add Location
+            </button>
+          )}
         </div>
       </div>
 
-      {showAdd && (
+      {/* Admin-only: Add Location form */}
+      {showAdd && !isPartner && (
         <div className="bg-white rounded-2xl border border-[#ee6b20]/30 p-6 space-y-4 shadow-sm">
           <h3 className="font-bold text-[#1e3d5a]">New Location</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -228,23 +286,44 @@ export default function AdminLocationsView() {
         </div>
       )}
 
+      {/* Business Partner: No locations assigned info */}
+      {isPartner && !isLoading && locations.length === 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center">
+          <MapPin className="size-8 text-amber-400 mx-auto mb-2" />
+          <h3 className="font-bold text-amber-800 mb-1">No Location Assigned</h3>
+          <p className="text-sm text-amber-600">Your account has not been assigned a parking location yet. Please contact the administrator.</p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {isLoading ? <div className="col-span-3 text-center py-10"><RefreshCw className="size-6 text-[#ee6b20] animate-spin mx-auto" /></div> :
-         locations.length === 0 ? <div className="col-span-3 text-center py-10 text-gray-400 text-sm">No locations found</div> :
-         locations.map((loc: any) => (
+        {isLoading ? (
+          <div className="col-span-3 text-center py-10">
+            <RefreshCw className="size-6 text-[#ee6b20] animate-spin mx-auto" />
+          </div>
+        ) : locations.map((loc: any) => (
           <div key={loc.id} className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-all">
             <div className="flex items-start justify-between mb-3">
               <div className="size-10 bg-[#1e3d5a]/10 rounded-xl flex items-center justify-center">
                 <MapPin className="size-5 text-[#1e3d5a]" />
               </div>
-              <button onClick={() => handleDelete(String(loc.id), loc.name)} className="p-1.5 text-gray-300 hover:text-red-500 transition-colors">
-                <Trash2 className="size-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                {/* Hourly rate badge */}
+                {loc.hourlyRate != null && (
+                  <span className="px-2 py-1 bg-[#ee6b20]/10 text-[#ee6b20] text-[10px] font-black rounded-lg">
+                    ₱{Number(loc.hourlyRate).toFixed(2)}/hr
+                  </span>
+                )}
+                {/* Delete — admin only */}
+                {!isPartner && (
+                  <button onClick={() => handleDelete(String(loc.id), loc.name)} className="p-1.5 text-gray-300 hover:text-red-500 transition-colors">
+                    <Trash2 className="size-4" />
+                  </button>
+                )}
+              </div>
             </div>
             <h3 className="font-bold text-[#1e3d5a] mb-1">{loc.name}</h3>
             <p className="text-xs text-gray-400 mb-2">{loc.address}</p>
 
-            {/* Operating hours display */}
             <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-3">
               <Clock className="size-3 text-[#ee6b20]" />
               <span>{formatHoursDisplay(loc.operatingHours)}</span>
@@ -255,26 +334,31 @@ export default function AdminLocationsView() {
               <span className="text-gray-400">/ {loc.totalSpots} total</span>
             </div>
             <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mb-3">
-              <div className="h-full bg-[#ee6b20] rounded-full" style={{ width: `${Math.round(((loc.totalSpots - (loc.availableSpots ?? 0)) / loc.totalSpots) * 100)}%` }} />
+              <div className="h-full bg-[#ee6b20] rounded-full"
+                style={{ width: `${Math.round(((loc.totalSpots - (loc.availableSpots ?? 0)) / (loc.totalSpots || 1)) * 100)}%` }} />
             </div>
 
-            {/* Edit hours button */}
-            <button
-              onClick={() => setHoursModal(loc)}
-              className="w-full flex items-center justify-center gap-1.5 py-2 border border-[#1e3d5a]/20 text-[#1e3d5a] text-xs font-bold rounded-xl hover:bg-[#1e3d5a]/5 transition-colors"
-            >
-              <Clock className="size-3" /> Edit Operating Hours
-            </button>
+            <div className="space-y-2">
+              {/* Set Pricing — business_partner and admin */}
+              <button onClick={() => setPriceModal(loc)}
+                className="w-full flex items-center justify-center gap-1.5 py-2 bg-[#ee6b20]/10 text-[#ee6b20] border border-[#ee6b20]/20 text-xs font-bold rounded-xl hover:bg-[#ee6b20]/20 transition-colors">
+                <DollarSign className="size-3" /> Set Pricing
+              </button>
+              {/* Edit operating hours */}
+              <button onClick={() => setHoursModal(loc)}
+                className="w-full flex items-center justify-center gap-1.5 py-2 border border-[#1e3d5a]/20 text-[#1e3d5a] text-xs font-bold rounded-xl hover:bg-[#1e3d5a]/5 transition-colors">
+                <Clock className="size-3" /> Edit Operating Hours
+              </button>
+            </div>
           </div>
         ))}
       </div>
 
       {hoursModal && (
-        <OperatingHoursModal
-          location={hoursModal}
-          onClose={() => setHoursModal(null)}
-          onSaved={load}
-        />
+        <OperatingHoursModal location={hoursModal} onClose={() => setHoursModal(null)} onSaved={load} />
+      )}
+      {priceModal && (
+        <PricingModal location={priceModal} onClose={() => setPriceModal(null)} onSaved={load} />
       )}
     </div>
   );

@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Phone, Mail, Eye, EyeOff, Shield, Zap, Clock, User, ChevronLeft } from 'lucide-react';
+import { Phone, Mail, Eye, EyeOff, Shield, Zap, Clock, User, ChevronLeft, CheckCircle2, Loader2 } from 'lucide-react';
 import { authService } from '@/services/authService';
 import { toast } from 'sonner';
 
@@ -12,11 +12,47 @@ export default function SignUpPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm]   = useState(false);
   const [identifier, setIdentifier]     = useState('');
-  const [formData, setFormData]         = useState({ name: '', password: '', confirm: '' });
+  const [formData, setFormData]         = useState({ firstName: '', lastName: '', password: '', confirm: '' });
   const [errors, setErrors]             = useState({ identifier: '', password: '', confirm: '' });
   const [isLoading, setIsLoading]       = useState(false);
+  const [identifierTaken, setIdentifierTaken] = useState(false);
+  const [checkingId, setCheckingId]     = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isPhone = /^\d/.test(identifier) && !identifier.includes('@');
+
+  // Auto-capitalize: first letter of every word
+  const toTitleCase = (str: string) =>
+    str.replace(/\b\w+/g, word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+
+  // ── Debounced live-check ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!identifier) { setIdentifierTaken(false); return; }
+    // Only check after a valid-looking input
+    const minLength = isPhone ? 10 : 5;
+    if (identifier.length < minLength) { setIdentifierTaken(false); return; }
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setCheckingId(true);
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/auth/check-identifier?value=${encodeURIComponent(identifier)}`
+        );
+        const data = await res.json();
+        setIdentifierTaken(!data.available);
+        if (!data.available) {
+          setErrors(prev => ({ ...prev, identifier: 'This email / phone number is already registered.' }));
+        } else {
+          setErrors(prev => ({ ...prev, identifier: '' }));
+        }
+      } catch { /* network fail — fail open */ }
+      finally { setCheckingId(false); }
+    }, 600);
+
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identifier]);
 
   const validatePassword = (pwd: string) => {
     if (!pwd) return '';
@@ -25,13 +61,21 @@ export default function SignUpPage() {
     return '';
   };
 
+  const normalizePhone = (val: string) => {
+    // Strip everything except digits
+    let digits = val.replace(/\D/g, '');
+    // PH users naturally type 09XXXXXXXXX — strip leading 0 since +63 is already shown
+    if (digits.startsWith('0')) digits = digits.slice(1);
+    return digits.slice(0, 10); // cap at 10 digits
+  };
+
   const handleIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
-    if (/^\d+$/.test(val) && !val.includes('@')) {
-      if (val.length <= 10) {
-        setIdentifier(val);
-        setErrors(prev => ({ ...prev, identifier: val.length > 0 && val.length < 10 ? 'Mobile number must be exactly 10 digits.' : '' }));
-      }
+    // Detect phone: pure digits (possibly with leading 0)
+    if (/^\d/.test(val) && !val.includes('@')) {
+      const normalized = normalizePhone(val);
+      setIdentifier(normalized);
+      setErrors(prev => ({ ...prev, identifier: normalized.length > 0 && normalized.length < 10 ? 'Mobile number must be exactly 10 digits.' : '' }));
     } else {
       setIdentifier(val);
       setErrors(prev => ({ ...prev, identifier: '' }));
@@ -48,11 +92,14 @@ export default function SignUpPage() {
     if (formData.password !== formData.confirm) { newErrors.confirm = "Passwords don't match."; hasError = true; }
     setErrors(newErrors);
     if (hasError) return;
+    if (identifierTaken) return; // blocked by live check
 
     setIsLoading(true);
     try {
-      const email = isPhone ? `+63${identifier}` : identifier;
-      await authService.register({ name: formData.name, email, password: formData.password });
+      const payload = isPhone
+        ? { firstName: formData.firstName, lastName: formData.lastName, phone: `+63${identifier}`, password: formData.password }
+        : { firstName: formData.firstName, lastName: formData.lastName, email: identifier,          password: formData.password };
+      await authService.register(payload);
       toast.success('Account created! Please log in to continue.');
       router.push('/login');
     } catch (err: any) {
@@ -115,14 +162,27 @@ export default function SignUpPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Full Name */}
-              <div>
-                <label className="text-[10px] font-bold text-[#1e3d5a] tracking-widest uppercase mb-1.5 block opacity-70">Full Name</label>
-                <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-[#8492a6]" />
-                  <input type="text" placeholder="Juan dela Cruz" required
-                    className="h-12 w-full pl-12 bg-[#f8fafc] border border-[#e2e8f0] rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3d5a]/20"
-                    value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+              {/* First Name & Last Name */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-[#1e3d5a] tracking-widest uppercase mb-1.5 block opacity-70">First Name</label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-[#8492a6]" />
+                    <input type="text" placeholder="Juan" required
+                      className="h-12 w-full pl-12 bg-[#f8fafc] border border-[#e2e8f0] rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3d5a]/20"
+                      value={formData.firstName}
+                      onChange={e => setFormData({ ...formData, firstName: toTitleCase(e.target.value) })} />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-[#1e3d5a] tracking-widest uppercase mb-1.5 block opacity-70">Last Name</label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-[#8492a6]" />
+                    <input type="text" placeholder="dela Cruz" required
+                      className="h-12 w-full pl-12 bg-[#f8fafc] border border-[#e2e8f0] rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3d5a]/20"
+                      value={formData.lastName}
+                      onChange={e => setFormData({ ...formData, lastName: toTitleCase(e.target.value) })} />
+                  </div>
                 </div>
               </div>
 
@@ -135,12 +195,30 @@ export default function SignUpPage() {
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8492a6]">
                       {isPhone ? <Phone className="size-5" /> : <Mail className="size-5" />}
                     </div>
-                    <input type="text" placeholder="name@email.com or 9123456789" required
-                      className={`h-12 w-full pl-12 bg-[#f8fafc] border ${errors.identifier ? 'border-red-400' : 'border-[#e2e8f0]'} rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3d5a]/20`}
+                  <input type="text" placeholder="name@email.com or 9123456789" required
+                      className={`h-12 w-full pl-12 bg-[#f8fafc] border ${
+                        errors.identifier || identifierTaken ? 'border-red-400 ring-1 ring-red-300' : 'border-[#e2e8f0]'
+                      } rounded-2xl text-sm focus:outline-none focus:ring-2 ${errors.identifier || identifierTaken ? 'focus:ring-red-300' : 'focus:ring-[#1e3d5a]/20'} transition-all`}
                       value={identifier} onChange={handleIdentifierChange} />
                   </div>
                 </div>
-                {errors.identifier && <p className="text-[11px] text-red-500 font-semibold mt-1.5 px-1">{errors.identifier}</p>}
+                {/* Live status indicator */}
+                {checkingId && (
+                  <p className="text-[11px] text-gray-400 font-medium mt-1.5 px-1 flex items-center gap-1">
+                    <Loader2 className="size-3 animate-spin" /> Checking availability...
+                  </p>
+                )}
+                {!checkingId && identifierTaken && (
+                  <p className="text-[11px] text-red-500 font-semibold mt-1.5 px-1">{errors.identifier}</p>
+                )}
+                {!checkingId && !identifierTaken && identifier.length >= (isPhone ? 10 : 5) && (
+                  <p className="text-[11px] text-green-600 font-semibold mt-1.5 px-1 flex items-center gap-1">
+                    <CheckCircle2 className="size-3" /> Available
+                  </p>
+                )}
+                {!checkingId && !identifierTaken && errors.identifier && (
+                  <p className="text-[11px] text-red-500 font-semibold mt-1.5 px-1">{errors.identifier}</p>
+                )}
               </div>
 
               {/* Password */}
@@ -179,17 +257,6 @@ export default function SignUpPage() {
               </button>
             </form>
 
-            <div className="mt-5 mb-4 relative">
-              <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-[#e2e8f0]" /></div>
-              <div className="relative flex justify-center text-xs font-bold uppercase tracking-widest text-[#8492a6]">
-                <span className="bg-white px-4">Or Sign Up With</span>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-              {['Google', 'Facebook', 'PakiShip'].map(p => (
-                <button key={p} className="h-12 rounded-2xl border border-[#e2e8f0] text-[#1e3d5a] font-bold text-xs flex items-center justify-center gap-2 hover:bg-[#f8fafc] transition-all">{p}</button>
-              ))}
-            </div>
 
             <p className="text-center text-[#8492a6] font-bold text-sm mt-2">
               Already have an account?{' '}

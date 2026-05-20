@@ -2,7 +2,8 @@ const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
 
 /**
- * ParkingRate — aligned with public.parking_rates (integer IDs, camelCase).
+ * ParkingRate — aligned with teller.parking_rates (NOT public).
+ * Created as dedicated table per domain schema migration.
  */
 const ParkingRate = sequelize.define(
   'ParkingRate',
@@ -13,11 +14,11 @@ const ParkingRate = sequelize.define(
     dailyRate:   { type: DataTypes.FLOAT,   allowNull: false },
   },
   {
-    tableName: 'parking_rates',
-    schema: 'public',
+    tableName:  'parking_rates',
+    schema:     'teller',          // ← teller schema (NO public)
     timestamps: true,
     indexes: [
-      { name: 'parking_rates_vehicle_type_unique', unique: true, fields: ['vehicleType'] },
+      { name: 'teller_parking_rates_vehicle_type_unique', unique: true, fields: ['vehicleType'] },
     ],
   }
 );

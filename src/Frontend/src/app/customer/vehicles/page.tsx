@@ -4,13 +4,18 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
   ArrowLeft, Car, Truck, Bike, Plus, Trash2, Edit,
-  CheckCircle2, X, Upload, FileText, LogOut, Star,
+  CheckCircle2, X, Upload, FileText, LogOut, Star, Eye,
 } from 'lucide-react';
 import { vehiclesService } from '@/services/vehiclesService';
 import { authService } from '@/services/authService';
 import { toast } from 'sonner';
 
-const LOGO_SRC = '/assets/430f6b7df4e30a8a6fddb7fbea491ba629555e7c.png';
+const LOGO_SRC   = '/assets/430f6b7df4e30a8a6fddb7fbea491ba629555e7c.png';
+// Sample document images shown in the lightbox
+const DOC_SAMPLES: Record<string, { src: string; title: string }> = {
+  orDoc: { src: '/assets/LTO OR.png',                                          title: 'Sample: Official Receipt (OR)' },
+  crDoc: { src: '/assets/LTO-Certificate-of-Registration-Sample-3-768x959.webp', title: 'Sample: Certificate of Registration (CR)' },
+};
 
 /* ─── helpers ────────────────────────────────────────────────── */
 const VehicleIcon = ({ type, size }: { type?: string; size: number }) => {
@@ -44,6 +49,8 @@ export default function VehiclesPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...BLANK_FORM });
+  const [docErrors, setDocErrors] = useState({ orDoc: false, crDoc: false });
+  const [sampleDoc, setSampleDoc] = useState<string | null>(null); // lightbox state
 
   /* fetch ─────────────────────────────────────────────────────── */
   const load = useCallback(async () => {
@@ -79,6 +86,16 @@ export default function VehiclesPage() {
     if (!form.brand.trim()) { toast.error('Brand is required'); return; }
     if (!form.model.trim()) { toast.error('Model is required'); return; }
     if (!form.color.trim()) { toast.error('Color is required'); return; }
+
+    // OR and CR are required
+    const missingOr = !form.orDoc;
+    const missingCr = !form.crDoc;
+    setDocErrors({ orDoc: missingOr, crDoc: missingCr });
+    if (missingOr || missingCr) {
+      toast.error('Official Receipt (OR) and Certificate of Registration (CR) are required.');
+      return;
+    }
+    setDocErrors({ orDoc: false, crDoc: false });
 
     const payload = { ...form, plateNumber: plate, isDefault: false };
     try {
@@ -418,41 +435,73 @@ export default function VehiclesPage() {
                     onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
                     placeholder="e.g., Pearl White"
                   />
+                  <p className="text-[10px] text-amber-600 font-semibold pl-1 flex items-center gap-1">
+                    <span>⚠</span> Must match the color registered in your OR/CR.
+                  </p>
                 </div>
               </div>
 
-              {/* Optional docs */}
+              {/* Required docs */}
               <div className="pt-2 space-y-3">
                 <div className="flex items-center gap-2">
                   <div className="h-px bg-gray-100 flex-1" />
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2">Optional Documents</span>
+                  <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider px-2">Required Documents *</span>
                   <div className="h-px bg-gray-100 flex-1" />
                 </div>
-                {([['orDoc','Official Receipt (OR)', orRef], ['crDoc','Certificate of Registration (CR)', crRef]] as const).map(([field, label, ref]) => (
-                  <div
-                    key={field}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => ref.current?.click()}
-                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') ref.current?.click(); }}
-                    className="group border-2 border-dashed border-gray-200 rounded-2xl p-4 flex items-center gap-4 hover:bg-orange-50/50 hover:border-[#ee6b20]/40 transition-all cursor-pointer"
-                  >
-                    <div className="p-3 bg-gray-50 rounded-xl group-hover:bg-white group-hover:shadow-sm transition-all">
-                      <FileText size={20} className="text-gray-400 group-hover:text-[#ee6b20] transition-colors" />
+                {([['orDoc','Official Receipt (OR)', orRef], ['crDoc','Certificate of Registration (CR)', crRef]] as const).map(([field, label, ref]) => {
+                  const hasError = docErrors[field as 'orDoc' | 'crDoc'];
+                  const uploaded = form[field as 'orDoc' | 'crDoc'];
+                  return (
+                    <div
+                      key={field}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => { ref.current?.click(); setDocErrors(e => ({ ...e, [field]: false })); }}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') ref.current?.click(); }}
+                      className={`group border-2 border-dashed rounded-2xl p-4 flex items-center gap-4 transition-all cursor-pointer ${
+                        uploaded
+                          ? 'border-green-400 bg-green-50/40 hover:bg-green-50'
+                          : hasError
+                          ? 'border-red-400 bg-red-50/40 hover:bg-red-50/60'
+                          : 'border-gray-200 hover:bg-orange-50/50 hover:border-[#ee6b20]/40'
+                      }`}
+                    >
+                      <div className={`p-3 rounded-xl transition-all ${
+                        uploaded ? 'bg-green-100' : hasError ? 'bg-red-100' : 'bg-gray-50 group-hover:bg-white group-hover:shadow-sm'
+                      }`}>
+                        <FileText size={20} className={uploaded ? 'text-green-600' : hasError ? 'text-red-500' : 'text-gray-400 group-hover:text-[#ee6b20] transition-colors'} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-bold text-[#1e3d5a]">
+                            {label} <span className="text-red-500">*</span>
+                          </p>
+                          {/* View Sample link */}
+                          <button
+                            type="button"
+                            onClick={e => { e.stopPropagation(); setSampleDoc(field); }}
+                            className="flex items-center gap-1 text-[10px] font-bold text-[#ee6b20] hover:text-[#d95a10] bg-orange-50 hover:bg-orange-100 px-2 py-0.5 rounded-full transition-all shrink-0"
+                          >
+                            <Eye size={11} /> View Sample
+                          </button>
+                        </div>
+                        <p className={`text-xs truncate mt-0.5 ${
+                          uploaded ? 'text-green-600 font-medium' : hasError ? 'text-red-500 font-medium' : 'text-gray-400'
+                        }`}>
+                          {uploaded ? `✓ ${uploaded}` : hasError ? 'This document is required' : 'Click to upload PDF, JPG, or PNG (Max 5MB)'}
+                        </p>
+                      </div>
+                      <Upload size={18} className={`mr-2 transition-colors ${
+                        uploaded ? 'text-green-500' : hasError ? 'text-red-400' : 'text-gray-300 group-hover:text-[#ee6b20]'
+                      }`} />
+                      <input
+                        type="file" ref={ref} hidden
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={e => { handleDoc(e, field as 'orDoc'|'crDoc'); setDocErrors(d => ({ ...d, [field]: false })); }}
+                      />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-[#1e3d5a]">{label}</p>
-                      <p className="text-xs text-gray-400 truncate mt-0.5">
-                        {(form[field as 'orDoc'|'crDoc']) || 'Click to upload PDF, JPG, or PNG (Max 5MB)'}
-                      </p>
-                    </div>
-                    <Upload size={18} className="text-gray-300 group-hover:text-[#ee6b20] mr-2 transition-colors" />
-                    <input
-                      type="file" ref={ref} hidden
-                      onChange={e => handleDoc(e, field as 'orDoc'|'crDoc')}
-                    />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -470,6 +519,57 @@ export default function VehiclesPage() {
               >
                 Save Vehicle
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Sample Document Lightbox ── */}
+      {sampleDoc && DOC_SAMPLES[sampleDoc] && (
+        <div
+          className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in"
+          onClick={() => setSampleDoc(null)}
+        >
+          <div
+            className="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-orange-50 rounded-lg">
+                  <FileText size={16} className="text-[#ee6b20]" />
+                </div>
+                <div>
+                  <p className="font-black text-[#1e3d5a] text-sm">{DOC_SAMPLES[sampleDoc].title}</p>
+                  <p className="text-[10px] text-gray-400">This is what the document should look like</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSampleDoc(null)}
+                className="p-2 bg-gray-50 hover:bg-gray-100 rounded-full text-gray-400 hover:text-[#1e3d5a] transition-colors"
+              >
+                <X size={16} strokeWidth={2.5} />
+              </button>
+            </div>
+
+            {/* Image */}
+            <div className="p-4 bg-gray-50">
+              <Image
+                src={DOC_SAMPLES[sampleDoc].src}
+                alt={DOC_SAMPLES[sampleDoc].title}
+                width={600}
+                height={820}
+                className="w-full h-auto rounded-2xl shadow-sm border border-gray-200"
+                unoptimized
+              />
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 bg-orange-50 border-t border-orange-100 flex items-center gap-2">
+              <span className="text-[10px] font-bold text-[#ee6b20] uppercase tracking-wider">
+                ⚠ Upload a clear, readable scan or photo of your actual document.
+              </span>
             </div>
           </div>
         </div>

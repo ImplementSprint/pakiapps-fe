@@ -35,7 +35,7 @@ function buildSlots(locationId, sections, slotsPerSection, floors) {
         const isEV          = i === slotsPerSection && section === sections[sections.length - 1];
         const type = isHandicapped ? 'handicapped' : isEV ? 'ev_charging' : 'regular';
         slots.push({
-          locationId: parseInt(locationId),
+          locationId: locationId,
           label, section, floor, type,
           size: sizeForType(type),
           status: 'available',
@@ -250,19 +250,36 @@ const deleteSlot = async (req, res) => {
  */
 const generateSlots = async (req, res) => {
   try {
-    const { locationId, sections, slotsPerSection, floors } = req.body;
-    if (!locationId || !sections?.length || !slotsPerSection || !floors) {
-      return res.status(400).json({
-        success: false,
-        message: 'locationId, sections, slotsPerSection, floors are required',
-      });
+    const { locationId, sections, slotsPerSection, floors, slots } = req.body;
+    
+    if (!locationId) {
+      return res.status(400).json({ success: false, message: 'locationId is required' });
     }
 
     await ParkingSlot.destroy({ where: { locationId } });
-    const slotData = buildSlots(locationId, sections, slotsPerSection, floors);
-    const created  = await ParkingSlot.bulkCreate(slotData, { returning: true });
+    
+    let slotData = [];
+    if (slots && Array.isArray(slots) && slots.length > 0) {
+      // Use explicit list from client (supports custom categories/shapes)
+      slotData = slots.map(s => ({
+        ...s,
+        locationId: locationId,
+        status: s.status || 'available',
+        size: s.size || sizeForType(s.type)
+      }));
+    } else if (sections?.length && slotsPerSection && floors) {
+      // Fallback to even grid generation
+      slotData = buildSlots(locationId, sections, slotsPerSection, floors);
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Either (sections, slotsPerSection, floors) or explicit (slots) list is required',
+      });
+    }
 
+    const created = await ParkingSlot.bulkCreate(slotData, { returning: true });
     const totalCount = created.length;
+
     try {
       const location = await Location.findByPk(locationId);
       if (location) {
@@ -278,6 +295,7 @@ const generateSlots = async (req, res) => {
       message: `${created.length} slots generated for location ${locationId}`,
     });
   } catch (error) {
+    require('fs').writeFileSync('sync_error.log', error.stack || error.message);
     res.status(400).json({ success: false, message: error.message });
   }
 };

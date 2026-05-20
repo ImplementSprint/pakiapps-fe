@@ -1,0 +1,182 @@
+name: FE Single Pipeline
+
+on:
+  push:
+    branches: [main, uat, test]
+  pull_request:
+    branches: [main, uat, test]
+
+jobs:
+  # ── Job 1: Prepare system config ────────────────────────────────────────────
+  prepare:
+    name: Prepare System Config
+    runs-on: ubuntu-latest
+    outputs:
+      system: ${{ steps.set-system.outputs.system }}
+    steps:
+      - name: Set System
+        id: set-system
+        run: |
+          if [ -z "${{ vars.FE_SINGLE_SYSTEM_JSON }}" ]; then
+            echo "FE_SINGLE_SYSTEM_JSON is not set."
+            echo 'system={"name":"System-1","dir":"system-1-web","image":"system-1-web","vercel_project_secret":"VERCEL_PROJECT_ID_FE_SINGLE"}' >> $GITHUB_OUTPUT
+          else
+            echo "system=${{ vars.FE_SINGLE_SYSTEM_JSON }}" >> $GITHUB_OUTPUT
+          fi
+
+  # ── Job 2: Lint, Test & Build ───────────────────────────────────────────────
+  build-test:
+    name: Build & Test
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: './${{ fromJson(needs.prepare.outputs.system).dir }}/package-lock.json'
+
+      - name: Install Dependencies
+        run: |
+          cd ${{ fromJson(needs.prepare.outputs.system).dir }}
+          npm install
+
+      - name: Lint
+        run: |
+          cd ${{ fromJson(needs.prepare.outputs.system).dir }}
+          npm run lint
+        continue-on-error: true
+
+      - name: Test
+        run: |
+          cd ${{ fromJson(needs.prepare.outputs.system).dir }}
+          npm run test -- --ci --coverage --coverageReporters=json-summary 2>/dev/null || npm run test -- --ci
+        continue-on-error: true
+
+      - name: Upload Coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-summary
+          path: ${{ fromJson(needs.prepare.outputs.system).dir }}/coverage/coverage-summary.json
+          if-no-files-found: ignore
+
+      - name: Build
+        run: |
+          cd ${{ fromJson(needs.prepare.outputs.system).dir }}
+          npm run build
+
+  # ── Job 3: Deploy to Vercel (main & test branches) ──────────────────────────
+  deploy:
+    name: Deploy to Vercel
+    needs: [prepare, build-test]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/test' || github.ref == 'refs/heads/uat')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets[fromJson(needs.prepare.outputs.system).vercel_project_secret] }}
+          working-directory: ./${{ fromJson(needs.prepare.outputs.system).dir }}
+          vercel-args: ${{ github.ref == 'refs/heads/main' && '--prod' || '' }}
+
+  # ── Job 4: Auto PR creation (test → uat → main) ─────────────────────────────
+  auto-pr:
+    name: Create Promotion PR
+    needs: deploy
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/test' || github.ref == 'refs/heads/uat')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine target branch
+        id: target
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/test" ]; then
+            echo "target=uat" >> $GITHUB_OUTPUT
+          else
+            echo "target=main" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Pull Request
+        uses: repo-sync/pull-request@v2
+        with:
+          source_branch: ${{ github.ref_name }}
+          destination_branch: ${{ steps.target.outputs.target }}
+          pr_title: "chore: promote ${{ github.ref_name }} → ${{ steps.target.outputs.target }}"
+          pr_body: |
+            Automated promotion PR from `${{ github.ref_name }}` to `${{ steps.target.outputs.target }}`.
+            
+            Triggered by commit: ${{ github.sha }}
+          github_token: ${{ secrets.GH_PR_TOKEN || secrets.GHPR_TOKEN || secrets.GITHUB_TOKEN }}
+
+  # ── Job 5: Docker Build & Push (main only) ──────────────────────────────────
+  docker:
+    name: Docker Build & Push
+    needs: build-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ fromJson(needs.prepare.outputs.system).image }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ fromJson(needs.prepare.outputs.system).dir }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Job 6: SonarCloud Scan ──────────────────────────────────────────────────
+  sonar:
+    name: SonarCloud Scan
+    needs: build-test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: SonarCloud Scan
+        uses: sonarsource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        continue-on-error: true

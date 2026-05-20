@@ -5,11 +5,16 @@ export const authService = {
     const res = await api.post('/auth/login', { email, password });
     const user = res.data;
     if (typeof window !== 'undefined' && user?.token) {
-      localStorage.setItem('authToken', user.token);
-      localStorage.setItem('userRole', user.role);
-      localStorage.setItem('userName', user.name);
-      localStorage.setItem('userEmail', user.email);
-      localStorage.setItem('userId', user._id);
+      localStorage.setItem('authToken',       user.token);
+      localStorage.setItem('userRole',        user.role);
+      localStorage.setItem('userFirstName',   user.firstName || '');
+      localStorage.setItem('userLastName',    user.lastName  || '');
+      localStorage.setItem('userName',        user.name || `${user.firstName} ${user.lastName}`.trim());
+      localStorage.setItem('userIdentifier',  user.identifier || ''); // real phone or email
+      localStorage.setItem('userEmail',       user.email || '');      // null for phone users
+      localStorage.setItem('userPhone',       user.phone || '');      // null for email users
+      localStorage.setItem('userId',          user._id);
+      if (user.refreshToken) localStorage.setItem('refreshToken', user.refreshToken);
       if (user.profilePicture) localStorage.setItem('userProfilePic', user.profilePicture);
     }
     return user;
@@ -22,7 +27,7 @@ export const authService = {
     if (typeof window !== 'undefined') window.location.href = '/login';
   },
 
-  async register(data: { name: string; email: string; password: string; phone?: string }) {
+  async register(data: { firstName: string; lastName: string; email?: string; phone?: string; password: string }) {
     const res = await api.post('/auth/register/customer', data);
     return res.data;
   },

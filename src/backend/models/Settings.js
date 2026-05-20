@@ -1,28 +1,26 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
 
+/**
+ * Settings — aligned with teller.settings (NOT public.settings).
+ * Key/value store for teller configuration.
+ */
 const Settings = sequelize.define(
   'Settings',
   {
-    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    key: { type: DataTypes.STRING, allowNull: false, unique: true },
+    id: { type: DataTypes.UUID, primaryKey: true, defaultValue: DataTypes.UUIDV4 },
+    key:   { type: DataTypes.STRING, allowNull: false, unique: true },
     /** Any JSON value — string, number, boolean, object, array */
     value: { type: DataTypes.JSONB, allowNull: false },
-    category: {
-      type: DataTypes.ENUM('system', 'security', 'notifications', 'payment'),
-      allowNull: false,
-    },
   },
   {
     tableName:  'settings',
-    schema: 'public',
+    schema:     'teller',          // ← teller schema (NO public)
     timestamps: true,
+    updatedAt:  'updated_at',
+    createdAt:  false,
     indexes: [
-      // ── Unique key lookup ──────────────────────────────────────────────
-      { name: 'settings_key_unique', unique: true, fields: ['key'] },
-
-      // ── Load all settings by category ─────────────────────────────────
-      { name: 'idx_settings_category', fields: ['category'] },
+      { name: 'teller_settings_key_unique', unique: true, fields: ['key'] },
     ],
   }
 );

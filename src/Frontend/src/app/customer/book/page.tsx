@@ -99,6 +99,47 @@ function BookParkingContent() {
     });
   }, []);
 
+  const [isReceiptLoading, setIsReceiptLoading] = useState(false);
+  const [loadedBooking, setLoadedBooking] = useState<any>(null);
+
+  useEffect(() => {
+    const ref = searchParams.get('reference');
+    const step = searchParams.get('step');
+    if (step === 'receipt' && ref) {
+      setIsReceiptLoading(true);
+      bookingService.getMyBookings({ search: ref })
+        .then(res => {
+          if (res.bookings && res.bookings.length > 0) {
+            const b = res.bookings[0];
+            setTicketRef(b.reference);
+            setBookingData({
+              date: b.date,
+              selectedSlot: b.timeSlot,
+              selectedParkingSlot: { label: b.spot, floor: b.parkingSlotId ? 1 : 1 } as any,
+              paymentMethod: b.paymentMethod,
+              savedPaymentMethodId: null
+            });
+            setActiveVehicle({
+              _id: '',
+              plate: b.vehiclePlate || '---',
+              model: b.vehicleModel || 'Vehicle',
+              type: b.vehicleType || 'Sedan'
+            });
+            setLoadedBooking(b);
+            setCurrentStep('receipt');
+          } else {
+            toast.error('Booking details not found.');
+          }
+        })
+        .catch(err => {
+          toast.error('Failed to load booking details.');
+        })
+        .finally(() => {
+          setIsReceiptLoading(false);
+        });
+    }
+  }, [searchParams]);
+
   const [cardDetails, setCardDetails] = useState({ number: '', name: '', expiry: '', cvv: '' });
   const [focusedField, setFocusedField] = useState<'number' | 'name' | 'expiry' | 'cvv' | null>(null);
   const [cardError, setCardError] = useState('');
@@ -218,6 +259,12 @@ function BookParkingContent() {
         savedPaymentMethodId: bookingData.savedPaymentMethodId,
         ...(bookingData.selectedParkingSlot ? { parkingSlotId: bookingData.selectedParkingSlot._id || bookingData.selectedParkingSlot.id } : {}),
       } as any);
+
+      if ((result as any).checkoutUrl) {
+        toast.success('Redirecting to PayMongo payment gateway...');
+        window.location.href = (result as any).checkoutUrl;
+        return;
+      }
 
       setTicketRef(result.reference || 'PKP-XXXXXXXX');
       setIsConfirming(false);
@@ -395,128 +442,196 @@ function BookParkingContent() {
         )}
 
         {currentStep === 'review' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 w-full max-w-5xl mx-auto mt-4 px-4 sm:px-0">
-             <div className="grid lg:grid-cols-2 gap-12 items-start">
-               {/* Left Column */}
-               <div>
-                  <h2 className="text-4xl font-black text-[#1e3d5a] tracking-tight mb-2">Final <span className="text-[#ee6b20]">Review</span></h2>
-                  <p className="text-gray-500 font-medium mb-8">Please check your reservation details before confirming.</p>
-                  
-                  <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm space-y-4">
-                     <div className="flex items-center p-4 bg-gray-50 rounded-2xl gap-4">
-                        <div className="size-12 bg-white rounded-full flex items-center justify-center text-[#ee6b20] shadow-sm"><User className="size-5" /></div>
-                        <div>
-                           <p className="text-[10px] font-black tracking-widest text-gray-400 uppercase">Reserved For</p>
-                           <p className="font-bold text-[#1e3d5a]">{activeVehicle.plate}</p>
-                        </div>
-                     </div>
-                     <div className="flex items-center p-4 bg-gray-50 rounded-2xl gap-4">
-                        <div className="size-12 bg-white rounded-full flex items-center justify-center text-[#ee6b20] shadow-sm"><Clock className="size-5" /></div>
-                        <div>
-                           <p className="text-[10px] font-black tracking-widest text-gray-400 uppercase">Total Duration</p>
-                           <p className="font-bold text-[#1e3d5a]">1 Hour ({bookingData.selectedSlot})</p>
-                        </div>
-                     </div>
+          <div className="animate-in fade-in slide-in-from-bottom-4 w-full max-w-5xl mx-auto mt-2 px-0 sm:px-0">
+            <div className="grid lg:grid-cols-[1fr_360px] gap-6 items-start">
 
-                     <div className="pt-4">
-                        <h4 className="text-xs font-black tracking-widest text-[#1e3d5a] uppercase flex items-center gap-2 mb-4">
-                           <ShieldCheck className="size-4 text-[#ee6b20]" /> Booking Policy
-                        </h4>
-                        <ul className="space-y-3 text-xs font-medium text-gray-500">
-                           <li className="flex gap-2 items-start"><span className="text-[#ee6b20]">●</span> Grace period of 15 minutes for check-ins.</li>
-                           <li className="flex gap-2 items-start"><span className="text-[#ee6b20]">●</span> Non-refundable if canceled within 2 hours of arrival.</li>
-                           <li className="flex gap-2 items-start"><span className="text-[#ee6b20]">●</span> Present the E-Pass barcode to the attendant.</li>
-                        </ul>
-                     </div>
+              {/* ── Left: Summary ─────────────────────────── */}
+              <div className="flex flex-col gap-4">
 
+                {/* Title */}
+                <div>
+                  <h2 className="text-3xl font-black text-[#1e3d5a] tracking-tight leading-tight">
+                    Final <span className="text-[#ee6b20]">Review</span>
+                  </h2>
+                  <p className="text-sm text-gray-400 font-medium mt-1">Check your details before confirming.</p>
+                </div>
+
+                {/* Details Card */}
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm divide-y divide-gray-50 overflow-hidden">
+                  {/* Location row */}
+                  <div className="flex items-center gap-4 px-6 py-4">
+                    <div className="size-11 rounded-2xl bg-orange-50 flex items-center justify-center shrink-0">
+                      <MapPin className="size-5 text-[#ee6b20]" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black tracking-widest text-gray-400 uppercase">Parking Venue</p>
+                      <p className="font-bold text-[#1e3d5a] truncate">{locationName}</p>
+                    </div>
                   </div>
 
-                  <div className="flex flex-col-reverse sm:flex-row items-stretch gap-3 mt-6">
-                     <button onClick={() => setCurrentStep('timeslot')} className="px-8 py-4 sm:w-auto bg-gray-100 hover:bg-gray-200 text-[#1e3d5a] font-black uppercase tracking-widest text-sm rounded-3xl transition-all shadow-sm flex items-center justify-center">
-                        Back
-                     </button>
-                     <div className="flex-1 bg-[#1e3d5a] rounded-3xl p-6 flex items-center justify-between shadow-xl">
-                        <div>
-                           <p className="text-[11px] font-black tracking-widest text-[#90b4d8] uppercase">Total to Pay</p>
-                           <p className="text-3xl font-black text-white">₱{HOURLY_RATE.toFixed(2)}</p>
-                        </div>
-                        <button onClick={() => setCurrentStep('payment')} className="px-8 py-4 bg-[#ee6b20] hover:bg-[#d95a10] text-white font-black rounded-xl shadow-lg shadow-orange-500/30 transition-all uppercase tracking-widest text-sm transform hover:scale-105 active:scale-95">
-                           Confirm Now
-                        </button>
-                     </div>
+                  {/* Vehicle row */}
+                  <div className="flex items-center gap-4 px-6 py-4">
+                    <div className="size-11 rounded-2xl bg-blue-50 flex items-center justify-center shrink-0">
+                      <Car className="size-5 text-[#1e3d5a]" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-black tracking-widest text-gray-400 uppercase">Vehicle</p>
+                      <p className="font-bold text-[#1e3d5a]">{activeVehicle.plate}</p>
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full shrink-0">
+                      {activeVehicle.type}
+                    </span>
                   </div>
-               </div>
 
-               {/* Right Column E-Pass Ticket Preview */}
-               <div className="flex justify-center lg:justify-end">
-                  <div className="w-full max-w-sm bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-gray-100 relative mt-4 lg:mt-0 xl:mr-8 xl:scale-110 xl:origin-top">
-                     <div className="bg-[#1e3d5a] p-8 text-white relative">
-                        <p className="text-[10px] uppercase tracking-widest font-black text-[#90b4d8] mb-1">PakiPark E-Pass</p>
-                        <h3 className="text-3xl font-black text-[#ee6b20] mb-4">Fixed Slot</h3>
-                        <div className="flex items-center gap-2 text-sm font-medium text-white/80">
-                           <MapPin className="size-4" /> {locationName}
-                        </div>
-                        <div className="absolute top-8 right-8 bg-white/10 p-3 rounded-2xl"><Car className="size-5" /></div>
-                     </div>
-                     
-                     <div className="p-8 relative">
-                        {/* Cutouts */}
-                        <div className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 size-8 bg-[#f4f7fa] rounded-full" />
-                        <div className="absolute right-0 top-0 translate-x-1/2 -translate-y-1/2 size-8 bg-[#f4f7fa] rounded-full" />
-                        <div className="absolute left-6 right-6 top-0 border-t-2 border-dashed border-gray-200" />
-                        
-                        <div className="grid grid-cols-2 gap-y-6 pt-4">
-                           <div>
-                              <p className="text-[9px] uppercase font-black text-gray-400 tracking-widest mb-1">Driver Name</p>
-                              <p className="font-bold text-[#1e3d5a] truncate pr-2 max-w-[120px]">{activeVehicle.plate ? 'Guest User' : 'Unknown'}</p>
-                           </div>
-                           <div className="text-right">
-                              <p className="text-[9px] uppercase font-black text-gray-400 tracking-widest mb-1">Plate Number</p>
-                              <p className="font-bold text-[#ee6b20] uppercase">{activeVehicle.plate}</p>
-                           </div>
-                           <div>
-                              <p className="text-[9px] uppercase font-black text-gray-400 tracking-widest mb-1">Date</p>
-                              <p className="font-bold text-[#1e3d5a]">{bookingData.date}</p>
-                           </div>
-                           <div className="text-right">
-                              <p className="text-[9px] uppercase font-black text-gray-400 tracking-widest mb-1">Time Slot</p>
-                              <p className="font-bold text-[#1e3d5a]">{bookingData.selectedSlot.split(' - ')[0]}</p>
-                           </div>
-                           <div>
-                              <p className="text-[9px] uppercase font-black text-gray-400 tracking-widest mb-1">Floor</p>
-                              <p className="font-bold text-[#1e3d5a]">{bookingData.selectedParkingSlot?.floor || '1st Floor'}</p>
-                           </div>
-                           <div className="text-right">
-                              <p className="text-[9px] uppercase font-black text-gray-400 tracking-widest mb-1">Parking Slot</p>
-                              <p className="font-bold text-[#ee6b20]">{bookingData.selectedParkingSlot?.label || 'A-01'}</p>
-                           </div>
-                        </div>
-
-                        <div className="mt-8 bg-gray-50 rounded-2xl px-2 py-6 flex flex-col items-center justify-center gap-1 overflow-hidden">
-                           <div className="blur-[4px] opacity-40 flex flex-col items-center justify-center scale-90 sm:scale-100 pointer-events-none select-none">
-                              <Barcode value="PENDING" width={1.2} height={50} displayValue={false} background="transparent" />
-                              <p className="font-mono text-[9px] tracking-[0.3em] text-gray-500 mt-2">PENDING</p>
-                           </div>
-                           <p className="text-[8px] font-black uppercase text-[#ee6b20] mt-3 tracking-widest bg-orange-100 px-3 py-1 rounded-full">Awaiting Payment</p>
-                        </div>
-                     </div>
-                     
-                     <div className="bg-orange-50/50 m-2 rounded-[1.5rem] p-4 flex justify-between items-center border border-[#ee6b20]/10">
-                        <div className="flex items-center gap-3">
-                           <div className="p-2 bg-white rounded-xl text-[#ee6b20] shadow-sm"><Clock className="size-4" /></div>
-                           <div>
-                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Duration</p>
-                              <p className="text-xs font-bold text-[#1e3d5a]">1 Hour Reserved</p>
-                           </div>
-                        </div>
-                        <div className="text-right">
-                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Payment</p>
-                           <p className="text-xs font-bold text-[#1e3d5a]">Pending</p>
-                        </div>
-                     </div>
+                  {/* Schedule row */}
+                  <div className="flex items-center gap-4 px-6 py-4">
+                    <div className="size-11 rounded-2xl bg-green-50 flex items-center justify-center shrink-0">
+                      <Clock className="size-5 text-green-600" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-black tracking-widest text-gray-400 uppercase">Date & Time</p>
+                      <p className="font-bold text-[#1e3d5a]">{bookingData.date}</p>
+                      <p className="text-sm text-gray-500 font-medium">{bookingData.selectedSlot}</p>
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-green-50 text-green-700 px-2.5 py-1 rounded-full shrink-0">
+                      1 Hr
+                    </span>
                   </div>
-               </div>
-             </div>
+
+                  {/* Slot row */}
+                  {bookingData.selectedParkingSlot && (
+                    <div className="flex items-center gap-4 px-6 py-4">
+                      <div className="size-11 rounded-2xl bg-purple-50 flex items-center justify-center shrink-0">
+                        <Sparkles className="size-5 text-purple-600" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-black tracking-widest text-gray-400 uppercase">Assigned Slot</p>
+                        <p className="font-bold text-[#1e3d5a]">Floor {bookingData.selectedParkingSlot.floor}</p>
+                      </div>
+                      <span className="text-sm font-black text-[#ee6b20] bg-orange-50 border border-orange-100 px-3 py-1 rounded-full shrink-0">
+                        {bookingData.selectedParkingSlot.label}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Policy */}
+                <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-5">
+                  <h4 className="text-xs font-black tracking-widest text-[#1e3d5a] uppercase flex items-center gap-2 mb-3">
+                    <ShieldCheck className="size-4 text-[#ee6b20]" /> Booking Policy
+                  </h4>
+                  <ul className="space-y-2 text-xs font-medium text-gray-500">
+                    <li className="flex gap-2 items-start"><span className="text-[#ee6b20] mt-0.5">●</span>Grace period of 15 minutes for check-ins.</li>
+                    <li className="flex gap-2 items-start"><span className="text-[#ee6b20] mt-0.5">●</span>Non-refundable if canceled within 2 hours of arrival.</li>
+                    <li className="flex gap-2 items-start"><span className="text-[#ee6b20] mt-0.5">●</span>Present the E-Pass barcode to the attendant.</li>
+                  </ul>
+                </div>
+
+                {/* Action Bar */}
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setCurrentStep('timeslot')}
+                    className="h-14 px-7 bg-gray-100 hover:bg-gray-200 text-[#1e3d5a] font-black uppercase tracking-widest text-sm rounded-2xl transition-all shrink-0"
+                  >
+                    Back
+                  </button>
+                  <div className="flex-1 bg-[#1e3d5a] rounded-2xl p-1 flex items-center gap-1 shadow-xl">
+                    <div className="flex-1 px-4">
+                      <p className="text-[10px] font-black tracking-widest text-[#90b4d8] uppercase">Total to Pay</p>
+                      <p className="text-2xl font-black text-white leading-tight">₱{HOURLY_RATE.toFixed(2)}</p>
+                    </div>
+                    <button
+                      onClick={() => setCurrentStep('payment')}
+                      className="h-12 px-6 bg-[#ee6b20] hover:bg-[#d95a10] text-white font-black rounded-xl shadow-lg shadow-orange-500/30 transition-all uppercase tracking-widest text-sm transform hover:scale-105 active:scale-95 shrink-0"
+                    >
+                      Confirm Now
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* ── Right: E-Pass Ticket Preview ───────────── */}
+              <div className="flex justify-center lg:justify-start lg:sticky lg:top-24">
+                <div className="w-full max-w-[340px] bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-gray-100">
+
+                  {/* Ticket Header */}
+                  <div className="bg-gradient-to-br from-[#1e3d5a] to-[#162d42] p-7 text-white relative overflow-hidden">
+                    <div className="absolute -right-6 -top-6 size-28 bg-white/5 rounded-full" />
+                    <div className="absolute -right-2 top-10 size-16 bg-white/5 rounded-full" />
+                    <p className="text-[9px] uppercase tracking-[0.2em] font-black text-[#90b4d8] mb-2">PakiPark E-Pass · Preview</p>
+                    <h3 className="text-2xl font-black text-[#ee6b20] mb-1">Fixed Slot</h3>
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-white/70">
+                      <MapPin className="size-3.5 shrink-0" /> {locationName}
+                    </div>
+                    <div className="absolute top-7 right-7 bg-white/10 p-2.5 rounded-xl">
+                      <Car className="size-4" />
+                    </div>
+                  </div>
+
+                  {/* Perforated Edge */}
+                  <div className="relative h-4 bg-white">
+                    <div className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 size-7 bg-[#f4f7fa] rounded-full z-10" />
+                    <div className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 size-7 bg-[#f4f7fa] rounded-full z-10" />
+                    <div className="absolute left-6 right-6 top-1/2 border-t-2 border-dashed border-gray-200" />
+                  </div>
+
+                  {/* Ticket Body */}
+                  <div className="px-6 pb-4 pt-2">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                      <div>
+                        <p className="text-[9px] uppercase font-black text-gray-400 tracking-widest mb-0.5">Plate</p>
+                        <p className="font-bold text-[#ee6b20] uppercase text-sm">{activeVehicle.plate}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] uppercase font-black text-gray-400 tracking-widest mb-0.5">Date</p>
+                        <p className="font-bold text-[#1e3d5a] text-sm">{bookingData.date}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] uppercase font-black text-gray-400 tracking-widest mb-0.5">Time</p>
+                        <p className="font-bold text-[#1e3d5a] text-sm">{bookingData.selectedSlot.split(' - ')[0]}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] uppercase font-black text-gray-400 tracking-widest mb-0.5">Floor</p>
+                        <p className="font-bold text-[#1e3d5a] text-sm">{bookingData.selectedParkingSlot?.floor ?? '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] uppercase font-black text-gray-400 tracking-widest mb-0.5">Slot</p>
+                        <p className="font-bold text-[#ee6b20] text-sm">{bookingData.selectedParkingSlot?.label ?? 'Auto'}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] uppercase font-black text-gray-400 tracking-widest mb-0.5">Amount</p>
+                        <p className="font-bold text-[#1e3d5a] text-sm">₱{HOURLY_RATE.toFixed(2)}</p>
+                      </div>
+                    </div>
+
+                    {/* Blurred Barcode */}
+                    <div className="mt-5 bg-gray-50 rounded-2xl py-5 flex flex-col items-center justify-center overflow-hidden">
+                      <div className="blur-[5px] opacity-30 pointer-events-none select-none scale-90">
+                        <Barcode value="PENDING" width={1.2} height={44} displayValue={false} background="transparent" />
+                      </div>
+                      <span className="mt-2 text-[9px] font-black uppercase tracking-[0.2em] text-[#ee6b20] bg-orange-100 px-3 py-1 rounded-full">
+                        Awaiting Payment
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Ticket Footer */}
+                  <div className="mx-3 mb-3 bg-orange-50 border border-orange-100/80 rounded-2xl px-4 py-3 flex justify-between items-center">
+                    <div>
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Duration</p>
+                      <p className="text-xs font-bold text-[#1e3d5a]">1 Hour</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Status</p>
+                      <p className="text-xs font-bold text-amber-500">Pending</p>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+            </div>
           </div>
         )}
 
@@ -833,85 +948,138 @@ function BookParkingContent() {
 
         {currentStep === 'receipt' && (
           <div className="max-w-md mx-auto animate-in zoom-in-95 mt-4 pb-8">
-             <div className="w-full bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-gray-100 relative">
-                 <div className="bg-[#1e3d5a] p-8 text-white relative">
-                    <p className="text-[10px] uppercase tracking-widest font-black text-[#90b4d8] mb-1">PakiPark Official E-Pass</p>
-                    <h3 className="text-3xl font-black text-[#ee6b20] mb-4">Fixed Slot</h3>
-                    <div className="flex items-center gap-2 text-sm font-medium text-white/80">
-                       <MapPin className="size-4" /> {locationName}
-                    </div>
-                    <div className="absolute top-8 right-8 bg-white/10 p-3 rounded-2xl"><Car className="size-5" /></div>
-                 </div>
-                 
-                 <div className="p-8 relative">
-                    <div className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 size-8 bg-[#f4f7fa] rounded-full" />
-                    <div className="absolute right-0 top-0 translate-x-1/2 -translate-y-1/2 size-8 bg-[#f4f7fa] rounded-full" />
-                    <div className="absolute left-6 right-6 top-0 border-t-2 border-dashed border-gray-200" />
-                    
-                    <div className="grid grid-cols-2 gap-y-6 pt-4">
-                       <div>
-                          <p className="text-[9px] uppercase font-black text-gray-400 tracking-widest mb-1">Driver Name</p>
-                          <p className="font-bold text-[#1e3d5a] truncate pr-2 max-w-[120px]">{activeVehicle.plate ? 'Guest User' : 'Unknown'}</p>
-                       </div>
-                       <div className="text-right">
-                          <p className="text-[9px] uppercase font-black text-gray-400 tracking-widest mb-1">Plate Number</p>
-                          <p className="font-bold text-[#ee6b20] uppercase">{activeVehicle.plate}</p>
-                       </div>
-                       <div>
-                          <p className="text-[9px] uppercase font-black text-gray-400 tracking-widest mb-1">Date</p>
-                          <p className="font-bold text-[#1e3d5a]">{bookingData.date}</p>
-                       </div>
-                       <div className="text-right">
-                          <p className="text-[9px] uppercase font-black text-gray-400 tracking-widest mb-1">Time Slot</p>
-                          <p className="font-bold text-[#1e3d5a]">{bookingData.selectedSlot.split(' - ')[0]}</p>
-                       </div>
-                       <div>
-                          <p className="text-[9px] uppercase font-black text-gray-400 tracking-widest mb-1">Floor</p>
-                          <p className="font-bold text-[#1e3d5a]">{bookingData.selectedParkingSlot?.floor || '1st Floor'}</p>
-                       </div>
-                       <div className="text-right">
-                          <p className="text-[9px] uppercase font-black text-gray-400 tracking-widest mb-1">Parking Slot</p>
-                          <p className="font-bold text-[#ee6b20]">{bookingData.selectedParkingSlot?.label || 'A-01'}</p>
-                       </div>
-                    </div>
 
-                    <div className="mt-8 bg-gray-50 rounded-2xl px-2 py-6 flex flex-col items-center justify-center overflow-hidden">
-                       <div className="scale-90 sm:scale-100 flex flex-col items-center justify-center">
-                          <Barcode value={ticketRef} width={1.2} height={60} displayValue={false} background="transparent" />
-                       </div>
-                       <p className="font-mono text-[10px] tracking-[0.3em] text-gray-500 mt-3">{ticketRef}</p>
-                       <p className="text-[10px] font-black uppercase text-[#ee6b20] mt-4 tracking-widest">Present to Attendant</p>
-                    </div>
-                 </div>
-                 
-                 <div className="bg-orange-50/50 m-2 rounded-[1.5rem] p-4 flex justify-between items-center border border-[#ee6b20]/10">
-                    <div className="flex items-center gap-3">
-                       <div className="p-2 bg-white rounded-xl text-[#ee6b20] shadow-sm"><Clock className="size-4" /></div>
-                       <div>
-                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Duration</p>
-                          <p className="text-xs font-bold text-[#1e3d5a]">1 Hour Reserved</p>
-                       </div>
+            {/* ─── @media print styles injected inline ─── */}
+            <style>{`
+              @media print {
+                body * { visibility: hidden !important; }
+                #epass-print, #epass-print * { visibility: visible !important; }
+                #epass-print {
+                  position: fixed !important;
+                  inset: 0 !important;
+                  width: 100vw !important;
+                  height: 100vh !important;
+                  display: flex !important;
+                  align-items: center !important;
+                  justify-content: center !important;
+                  background: #fff !important;
+                  padding: 0 !important;
+                  margin: 0 !important;
+                }
+                #epass-card {
+                  width: 360px !important;
+                  border-radius: 24px !important;
+                  overflow: hidden !important;
+                  box-shadow: none !important;
+                  border: 1px solid #e2e8f0 !important;
+                  page-break-inside: avoid !important;
+                }
+              }
+            `}</style>
+
+            {/* ── Printable E-Pass card ── */}
+            <div id="epass-print">
+              <div id="epass-card" className="w-full bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-gray-100">
+
+                {/* Header */}
+                <div className="bg-[#1e3d5a] px-7 pt-6 pb-5 text-white relative overflow-hidden">
+                  <div className="absolute -right-4 -top-4 size-24 bg-white/5 rounded-full" />
+                  <div className="absolute right-6 top-5">
+                    <Image src={LOGO_SRC} alt="PakiPark" width={38} height={38} unoptimized className="opacity-80" />
+                  </div>
+                  <p className="text-[9px] uppercase tracking-[0.25em] font-black text-[#90b4d8] mb-1">PakiPark Official E-Pass</p>
+                  <h3 className="text-3xl font-black text-[#ee6b20]">Fixed Slot</h3>
+                  <div className="flex items-center gap-1.5 mt-2 text-xs font-medium text-white/70">
+                    <MapPin className="size-3.5 shrink-0" />{locationName}
+                  </div>
+                </div>
+
+                {/* Perforated divider */}
+                <div className="relative h-5 bg-gray-50">
+                  <div className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 size-8 bg-[#f4f7fa] rounded-full" />
+                  <div className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 size-8 bg-[#f4f7fa] rounded-full" />
+                  <div className="absolute left-6 right-6 top-1/2 border-t-2 border-dashed border-gray-200" />
+                </div>
+
+                {/* Detail grid — matches screenshot exactly */}
+                <div className="px-7 py-5 space-y-5 bg-white">
+                  <div className="grid grid-cols-2 gap-y-5">
+                    {/* Row 1 */}
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Driver Name</p>
+                      <p className="text-base font-black text-[#1e3d5a]">
+                        {activeVehicle.plate ? 'Guest User' : 'Unknown'}
+                      </p>
                     </div>
                     <div className="text-right">
-                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Amount Paid</p>
-                       <p className="text-sm font-black text-[#1e3d5a]">₱{HOURLY_RATE.toFixed(2)}</p>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Plate Number</p>
+                      <p className="text-base font-black text-[#ee6b20] uppercase">{activeVehicle.plate}</p>
                     </div>
-                 </div>
-              </div>
+                    {/* Row 2 */}
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Date</p>
+                      <p className="text-base font-black text-[#1e3d5a]">{bookingData.date}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Time Slot</p>
+                      <p className="text-base font-black text-[#1e3d5a]">{bookingData.selectedSlot.split(' - ')[0]}</p>
+                    </div>
+                    {/* Row 3 */}
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Floor</p>
+                      <p className="text-base font-black text-[#1e3d5a]">{bookingData.selectedParkingSlot?.floor ?? '1'}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Parking Slot</p>
+                      <p className="text-base font-black text-[#ee6b20]">{bookingData.selectedParkingSlot?.label ?? 'A-01'}</p>
+                    </div>
+                  </div>
 
-            <div className="space-y-3 mt-8 px-4">
-              <div className="grid grid-cols-2 gap-3 mb-2">
-                 <Button className="w-full bg-white h-14 rounded-2xl font-bold gap-2 text-gray-600 border border-gray-200 shadow-sm hover:bg-gray-50">
-                    <Share className="size-4" /> Share
-                 </Button>
-                 <Button className="w-full bg-white h-14 rounded-2xl font-bold gap-2 text-gray-600 border border-gray-200 shadow-sm hover:bg-gray-50">
-                    <Download className="size-4" /> Save Image
-                 </Button>
+                  {/* Barcode */}
+                  <div className="bg-gray-50 rounded-2xl py-6 flex flex-col items-center justify-center">
+                    <Barcode
+                      value={ticketRef}
+                      width={1.5}
+                      height={64}
+                      displayValue={false}
+                      background="transparent"
+                    />
+                    <p className="font-mono text-[10px] tracking-[0.3em] text-gray-500 mt-2">{ticketRef}</p>
+                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#ee6b20] mt-3">Present to Attendant</p>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="mx-3 mb-3 bg-orange-50 border border-orange-100 rounded-2xl px-5 py-3.5 flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white rounded-xl shadow-sm text-[#ee6b20]"><Clock className="size-4" /></div>
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Duration</p>
+                      <p className="text-sm font-bold text-[#1e3d5a]">1 Hour Reserved</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Amount Paid</p>
+                    <p className="text-sm font-black text-[#1e3d5a]">₱{HOURLY_RATE.toFixed(2)}</p>
+                  </div>
+                </div>
+
               </div>
-              <Button onClick={() => globalThis.print()} className="w-full bg-[#1e3d5a] h-14 rounded-2xl font-bold gap-2 hover:bg-transparent hover:text-[#1e3d5a] border border-[#1e3d5a] transition-colors shadow-xl">
-                <Download className="size-4" /> Download/Print E-Pass
+            </div>
+
+            {/* ── Action buttons (hidden when printing) ── */}
+            <div className="space-y-3 mt-6 px-1">
+              <Button
+                onClick={() => globalThis.print()}
+                className="w-full bg-[#1e3d5a] hover:bg-[#2a5373] h-14 rounded-2xl font-bold gap-2 text-white shadow-xl transition-all"
+              >
+                <Download className="size-4" /> Download / Print E-Pass
               </Button>
-              <Button onClick={() => router.push('/customer/home')} variant="outline" className="w-full h-14 rounded-2xl font-bold border-gray-200 text-gray-600 bg-white shadow-sm hover:border-[#1e3d5a] transition-colors">
+              <Button
+                onClick={() => router.push('/customer/home')}
+                variant="outline"
+                className="w-full h-14 rounded-2xl font-bold border-gray-200 text-gray-600 bg-white shadow-sm hover:border-[#1e3d5a] transition-colors"
+              >
                 Return to Dashboard
               </Button>
             </div>

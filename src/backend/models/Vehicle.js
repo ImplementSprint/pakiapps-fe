@@ -2,7 +2,8 @@ const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
 
 /**
- * Vehicle — aligned with public.vehicles (integer IDs, camelCase).
+ * Vehicle — aligned with teller.vehicles (NOT public).
+ * Managed by tellers; userId is an integer FK to account.users.id.
  */
 const Vehicle = sequelize.define(
   'Vehicle',
@@ -23,11 +24,11 @@ const Vehicle = sequelize.define(
   },
   {
     tableName:  'vehicles',
-    schema: 'public',
+    schema:     'teller',          // ← teller schema (NO public)
     timestamps: true,
     indexes: [
-      { name: 'idx_vehicles_user',  fields: ['userId'] },
-      { name: 'idx_vehicles_plate', fields: ['plateNumber'] },
+      { name: 'idx_teller_vehicles_user',  fields: ['userId'] },
+      { name: 'idx_teller_vehicles_plate', fields: ['plateNumber'] },
     ],
   }
 );

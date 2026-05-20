@@ -1,30 +1,47 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { bookingService, type Booking } from '@/services/bookingService';
-import { Search, RefreshCw } from 'lucide-react';
+import { Search, RefreshCw, MapPin } from 'lucide-react';
 
 const STATUSES = ['all','upcoming','active','completed','cancelled'] as const;
 type StatusFilter = typeof STATUSES[number];
 
 export default function AdminBookingsView() {
-  const [bookings, setBookings]        = useState<Booking[]>([]);
-  const [status, setStatus]            = useState<StatusFilter>('all');
-  const [search, setSearch]            = useState('');
-  const [isLoading, setIsLoading]      = useState(true);
-  const [page, setPage]                = useState(1);
-  const [total, setTotal]              = useState(0);
+  const role = typeof window !== 'undefined' ? (localStorage.getItem('userRole') ?? 'admin') : 'admin';
+  const isScoped = role === 'business_partner' || role === 'teller';
+
+  const [bookings, setBookings]   = useState<Booking[]>([]);
+  const [status, setStatus]       = useState<StatusFilter>('all');
+  const [search, setSearch]       = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [page, setPage]           = useState(1);
+  const [total, setTotal]         = useState(0);
+  const [locationLabel, setLocationLabel] = useState('');
 
   const load = async () => {
     setIsLoading(true);
     try {
-      const data = await bookingService.getAllBookings({ status: status === 'all' ? undefined : status, search: search || undefined, page });
+      const data = await bookingService.getAllBookings({
+        status: status === 'all' ? undefined : status,
+        search: search || undefined,
+        page,
+      });
       setBookings(data.bookings);
       setTotal(data.total);
     } catch (err) { console.error(err); }
     finally { setIsLoading(false); }
   };
 
-  useEffect(() => { load(); }, [status, page]);
+  useEffect(() => {
+    load();
+    if (isScoped && !locationLabel) {
+      import('@/services/locationsService').then(m => {
+        m.locationsService.getLocations().then(locs => {
+          if (locs.length > 0) setLocationLabel(locs[0].name);
+        }).catch(() => {});
+      });
+    }
+  }, [status, page]);
   const handleSearch = () => { setPage(1); load(); };
 
   const badge: Record<string, string> = {
@@ -37,6 +54,20 @@ export default function AdminBookingsView() {
 
   return (
     <div className="space-y-6">
+      {/* Location scope banner for teller/business_partner */}
+      {isScoped && locationLabel && (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-[#1e3d5a]/5 border border-[#1e3d5a]/10 rounded-xl text-sm font-medium text-[#1e3d5a]">
+          <MapPin className="size-4 text-[#ee6b20] shrink-0" />
+          <span>Showing bookings for: <strong>{locationLabel}</strong></span>
+        </div>
+      )}
+      {isScoped && !locationLabel && !isLoading && (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
+          <MapPin className="size-4 shrink-0" />
+          <span>No location assigned to your account yet.</span>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
@@ -73,7 +104,7 @@ export default function AdminBookingsView() {
               ) : bookings.map(b => (
                 <tr key={b._id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 text-xs font-mono font-bold text-[#1e3d5a]">{b.reference}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{(b.userId as any)?.name ?? '—'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">{(b.userId as any)?.name ?? (b as any).userName ?? '—'}</td>
                   <td className="px-4 py-3 text-sm font-bold text-[#ee6b20]">{b.spot}</td>
                   <td className="px-4 py-3 text-sm text-gray-600">{b.date}</td>
                   <td className="px-4 py-3 text-sm text-gray-600">{b.timeSlot}</td>

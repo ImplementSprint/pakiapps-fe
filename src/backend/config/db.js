@@ -36,55 +36,38 @@ const sequelize = new Sequelize(
   }
 );
 
-// ─── Partial indexes for public schema ──────────────────────────────────────
+// ─── Performance indexes — domain schemas (NO public) ────────────────────────
 const PERFORMANCE_INDEXES = [
-  `CREATE INDEX IF NOT EXISTS idx_bookings_location_date_active
-     ON public.bookings ("locationId", date)
-     WHERE status IN ('upcoming', 'active')`,
+  `CREATE INDEX IF NOT EXISTS idx_res_bookings_location_date_active
+     ON reservation.bookings (location_id, date)
+     WHERE status IN ('Pending', 'Confirmed', 'CheckedIn')`,
 
-  `CREATE INDEX IF NOT EXISTS idx_bookings_slot_date_active
-     ON public.bookings ("parkingSlotId", date)
-     WHERE "parkingSlotId" IS NOT NULL AND status IN ('upcoming', 'active')`,
+  `CREATE INDEX IF NOT EXISTS idx_res_bookings_slot_date_active
+     ON reservation.bookings (parking_slot_id, date)
+     WHERE parking_slot_id IS NOT NULL AND status IN ('Pending', 'Confirmed', 'CheckedIn')`,
 
-  `CREATE INDEX IF NOT EXISTS idx_bookings_user_createdat
-     ON public.bookings ("userId", "createdAt" DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_res_bookings_user_createdat
+     ON reservation.bookings (user_id, "createdAt" DESC)`,
 
-  `CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_barcode
-     ON public.bookings (barcode)
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_res_bookings_barcode
+     ON reservation.bookings (barcode)
      WHERE barcode IS NOT NULL`,
+
+  `CREATE INDEX IF NOT EXISTS idx_routing_slots_teller
+     ON routing.parking_slots ("tellerUserId")`,
 ];
 
+
+// ── Startup migrations — domain schemas only (NO public) ────────────────────
 const STARTUP_MIGRATIONS = [
-  // ── Ensure table structures match the provided SQL ──────────────────────────
-  `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS "supabaseId" UUID`,
-  `ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS "reminderSentAt" TIMESTAMPTZ`,
-  
-  // ── operating_hours table (Partner Operating Hours) ──────────────────
-  `CREATE TABLE IF NOT EXISTS public.operating_hours (
-    id            SERIAL   PRIMARY KEY,
-    "locationId"  INTEGER  NOT NULL,
-    day_of_week   SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
-    open_time     TIME,
-    close_time    TIME,
-    is_closed     BOOLEAN  NOT NULL DEFAULT false,
-    "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    "updatedAt"   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT fk_operating_hours_location
-      FOREIGN KEY ("locationId") REFERENCES public.locations(id) ON DELETE CASCADE,
-    CONSTRAINT uq_operating_hours_location_day
-      UNIQUE ("locationId", day_of_week)
-  )`,
+  // Ensure reservation.bookings has reminderSentAt column
+  `ALTER TABLE reservation.bookings ADD COLUMN IF NOT EXISTS "reminderSentAt" TIMESTAMPTZ`,
 
-  // ── payment_methods extension ───────────────────────────────────────────────
-  `ALTER TABLE public.payment_methods ADD COLUMN IF NOT EXISTS "isDefault" BOOLEAN DEFAULT false`,
+  // Ensure account.users has supabaseId column
+  `ALTER TABLE account.users ADD COLUMN IF NOT EXISTS "supabaseId" UUID`,
 
-  // ── transaction_logs fallback ───────────────────────────────────────────────
-  `DO $$ BEGIN
-      IF EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace WHERE t.typname = 'enum_bookings_paymentMethod' AND n.nspname = 'public') THEN
-        ALTER TYPE public."enum_bookings_paymentMethod" ADD VALUE IF NOT EXISTS 'gcash_linked';
-      END IF;
-    EXCEPTION WHEN others THEN NULL;
-    END $$`,
+  // Ensure payment.payment_methods has isDefault column
+  `ALTER TABLE payment.payment_methods ADD COLUMN IF NOT EXISTS "isDefault" BOOLEAN DEFAULT false`,
 ];
 
 const connectDB = async () => {

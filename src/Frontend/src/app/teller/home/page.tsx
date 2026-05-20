@@ -7,7 +7,7 @@ import {
   ScanBarcode, Search, LogOut, CheckCircle2, Clock, AlertCircle,
   Calendar, MapPin, Car, User, Hash, ChevronRight, RefreshCw,
   XCircle, CheckCheck, Timer, Ticket, Menu, X, Bell, Shield,
-  Activity, DollarSign, Receipt, ArrowRight, TrendingUp, Zap,
+  Activity, DollarSign, Receipt, ArrowRight, TrendingUp, Zap, Video, VideoOff, Camera,
 } from 'lucide-react';
 import { bookingService, type Booking } from '@/services/bookingService';
 import { authService } from '@/services/authService';
@@ -85,6 +85,120 @@ function computeBillingPreview(checkInAt: string) {
     billableHours: billable,
     finalAmount:   amount,
   };
+}
+
+// ── Live Barcode Scanner Modal ─────────────────────────────────────────────────
+function BarcodeScannerModal({ onScan, onClose }: { onScan: (code: string) => void; onClose: () => void }) {
+  const videoRef   = useRef<HTMLVideoElement>(null);
+  const readerRef  = useRef<any>(null);
+  const [error, setError]       = useState('');
+  const [scanning, setScanning] = useState(false);
+
+  useEffect(() => {
+    let codeReader: any = null;
+    let stopped = false;
+
+    (async () => {
+      try {
+        setScanning(true);
+        setError('');
+        const { BrowserMultiFormatReader } = await import('@zxing/browser');
+        codeReader = new BrowserMultiFormatReader();
+        readerRef.current = codeReader;
+
+        const videoInputDevices = await BrowserMultiFormatReader.listVideoInputDevices();
+        if (videoInputDevices.length === 0) {
+          setError('No camera found on this device.');
+          setScanning(false);
+          return;
+        }
+
+        const deviceId = videoInputDevices[videoInputDevices.length - 1].deviceId; // prefer back camera
+        if (videoRef.current && !stopped) {
+          await codeReader.decodeFromVideoDevice(deviceId, videoRef.current, (result: any, err: any) => {
+            if (result) {
+              const text = result.getText();
+              onScan(text);
+            }
+          });
+        }
+      } catch (e: any) {
+        setError(e?.message || 'Camera access denied. Please allow camera permissions.');
+        setScanning(false);
+      }
+    })();
+
+    return () => {
+      stopped = true;
+      try { readerRef.current?.reset(); } catch (_) {}
+    };
+  }, [onScan]);
+
+  return (
+    <div className="fixed inset-0 bg-black/80 z-[300] flex items-center justify-center p-4 backdrop-blur-sm">
+      <div className="bg-[#1e3d5a] rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-300">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="size-9 bg-[#ee6b20] rounded-xl flex items-center justify-center">
+              <ScanBarcode className="size-5 text-white" />
+            </div>
+            <div>
+              <p className="font-black text-white text-sm">Live Barcode Scanner</p>
+              <p className="text-[10px] text-white/40">Point camera at the E-Pass barcode</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-white/40 hover:text-white transition-colors p-1">
+            <X className="size-5" />
+          </button>
+        </div>
+
+        {/* Camera view */}
+        <div className="relative bg-black" style={{ aspectRatio: '4/3' }}>
+          <video ref={videoRef} className="w-full h-full object-cover" muted autoPlay playsInline />
+
+          {/* Scanner overlay */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            {/* Darkened corners */}
+            <div className="absolute inset-0 bg-black/30" />
+            {/* Scan box */}
+            <div className="relative z-10 w-52 h-32">
+              {/* Corner brackets */}
+              <div className="absolute top-0 left-0 w-6 h-6 border-t-3 border-l-3 border-[#ee6b20] rounded-tl-md" style={{ borderTopWidth: 3, borderLeftWidth: 3 }} />
+              <div className="absolute top-0 right-0 w-6 h-6 border-t-3 border-r-3 border-[#ee6b20] rounded-tr-md" style={{ borderTopWidth: 3, borderRightWidth: 3 }} />
+              <div className="absolute bottom-0 left-0 w-6 h-6 border-b-3 border-l-3 border-[#ee6b20] rounded-bl-md" style={{ borderBottomWidth: 3, borderLeftWidth: 3 }} />
+              <div className="absolute bottom-0 right-0 w-6 h-6 border-b-3 border-r-3 border-[#ee6b20] rounded-br-md" style={{ borderBottomWidth: 3, borderRightWidth: 3 }} />
+              {/* Scan line animation */}
+              <div className="absolute left-1 right-1 h-0.5 bg-[#ee6b20]/80 animate-bounce" style={{ top: '50%', boxShadow: '0 0 8px #ee6b20' }} />
+            </div>
+          </div>
+
+          {scanning && !error && (
+            <div className="absolute bottom-3 left-0 right-0 flex justify-center">
+              <div className="bg-black/60 text-white text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                <div className="size-1.5 bg-[#ee6b20] rounded-full animate-pulse" />
+                Scanning…
+              </div>
+            </div>
+          )}
+        </div>
+
+        {error && (
+          <div className="px-5 py-3 flex items-center gap-2 bg-red-900/30 border-t border-red-800/30">
+            <AlertCircle className="size-4 text-red-400 shrink-0" />
+            <p className="text-xs text-red-300 font-medium">{error}</p>
+          </div>
+        )}
+
+        <div className="px-5 py-3 flex justify-center">
+          <button onClick={onClose}
+            className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white text-sm font-bold rounded-xl transition-colors">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── Status badge ───────────────────────────────────────────────────────────────
@@ -294,12 +408,32 @@ export default function TellerHomePage() {
   const router     = useRouter();
   const tellerName = typeof window !== 'undefined' ? (localStorage.getItem('userName') ?? 'Teller') : 'Teller';
 
+  // Auto-refresh token on mount so role claims are current
+  useEffect(() => {
+    const refresh = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+    if (!refresh) return;
+    fetch('/api/auth/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: refresh }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data?.data?.token) {
+          localStorage.setItem('authToken', data.data.token);
+          if (data.data.refreshToken) localStorage.setItem('refreshToken', data.data.refreshToken);
+        }
+      })
+      .catch(() => { /* silent — will fall back to stored token */ });
+  }, []);
+
   const [sidebarOpen,       setSidebarOpen]       = useState(false);
   const [activePage,        setActivePage]         = useState<NavPage>('checkin');
   const [activeTab,         setActiveTab]          = useState<BookingTab>('all');
   const [bookings,          setBookings]           = useState<Booking[]>([]);
   const [isLoadingBookings, setIsLoadingBookings]  = useState(true);
   const [isOffline,         setIsOffline]          = useState(false);
+  const [authError,         setAuthError]          = useState('');
   const [showLogout,        setShowLogout]         = useState(false);
 
   const today                              = toDateStr(new Date());
@@ -309,6 +443,7 @@ export default function TellerHomePage() {
   const [scannedBooking, setScannedBooking]= useState<Booking | null>(null);
   const [isLookingUp,    setIsLookingUp]  = useState(false);
   const [lookupError,    setLookupError]  = useState('');
+  const [showScanner,    setShowScanner]  = useState(false);
 
   const [actionId,        setActionId]      = useState<string | null>(null);
   const [checkoutTarget,  setCheckoutTarget]= useState<Booking | null>(null);
@@ -324,8 +459,15 @@ export default function TellerHomePage() {
       const result = await bookingService.getAllBookings({ date: selectedDate });
       setBookings(result.bookings ?? []);
       setIsOffline(false);
-    } catch {
-      if (!silent) setIsOffline(true);
+      setAuthError('');
+    } catch (err: any) {
+      const msg = err?.message || '';
+      if (msg.includes('403') || msg.toLowerCase().includes('access denied') || msg.toLowerCase().includes('privileges')) {
+        setAuthError('Session role mismatch — please log out and log in again.');
+        setIsOffline(false);
+      } else {
+        if (!silent) setIsOffline(true);
+      }
     } finally {
       if (!silent) setIsLoadingBookings(false);
     }
@@ -352,25 +494,52 @@ export default function TellerHomePage() {
   });
 
   // ── Lookup ───────────────────────────────────────────────────────────────────
-  const handleLookup = async () => {
-    if (!scanInput.trim()) return;
+  const handleLookup = useCallback(async (rawInput?: string) => {
+    const raw = (rawInput ?? scanInput).trim();
+    if (!raw) return;
+    if (rawInput) setScanInput(rawInput.toUpperCase());
     setIsLookingUp(true);
     setLookupError('');
     setScannedBooking(null);
     try {
-      const norm = scanInput.trim().toUpperCase().replace(/^PKP(\d+)$/, 'PKP-$1');
+      // Normalize: PKP00000001 → PKP-00000001, PKP-00000001 → PKP-00000001
+      const norm = raw.toUpperCase()
+        .replace(/^PKP(\d+)$/, 'PKP-$1')
+        .replace(/^PAKIPARK-?/i, 'PKP-');
       const result = await bookingService.getAllBookings({ search: norm });
-      const found  = (result.bookings ?? []).find(b =>
-        b.reference?.toUpperCase() === norm || b.barcode?.toUpperCase() === scanInput.trim().toUpperCase()
-      );
-      if (found) setScannedBooking(found);
-      else setLookupError(`No booking found for "${scanInput}"`);
-    } catch {
-      setLookupError('Could not reach server. Check your connection.');
+      const bookingList = result.bookings ?? [];
+      const found = bookingList.find(b =>
+        b.reference?.toUpperCase() === norm ||
+        b.barcode?.toUpperCase() === raw.toUpperCase() ||
+        b.barcode?.toUpperCase() === norm
+      ) ?? (bookingList.length === 1 ? bookingList[0] : null);
+      if (found) {
+        setScannedBooking(found);
+        setLookupError('');
+      } else if (bookingList.length > 0) {
+        setScannedBooking(bookingList[0]);
+      } else {
+        setLookupError(`No booking found for "${raw}"`);
+      }
+    } catch (err: any) {
+      const msg = err?.message || '';
+      if (msg.toLowerCase().includes('reach') || msg.toLowerCase().includes('fetch') || msg.toLowerCase().includes('network')) {
+        setLookupError('Cannot connect to server. Please check that the backend is running.');
+      } else if (msg.toLowerCase().includes('403') || msg.toLowerCase().includes('forbidden')) {
+        setLookupError('Access denied. Teller is not assigned to a location.');
+      } else {
+        setLookupError(msg || 'Lookup failed. Please try again.');
+      }
     } finally {
       setIsLookingUp(false);
     }
-  };
+  }, [scanInput]);
+
+  const handleScanResult = useCallback((code: string) => {
+    setShowScanner(false);
+    toast.success(`Barcode detected: ${code}`);
+    handleLookup(code);
+  }, [handleLookup]);
 
   // ── Check In ─────────────────────────────────────────────────────────────────
   const doCheckIn = async (booking: Booking) => {
@@ -531,11 +700,22 @@ export default function TellerHomePage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {isOffline && (
+            {authError && (
+              <span className="bg-red-50 text-red-700 border border-red-200 px-3 py-1.5 rounded-xl text-[10px] font-bold flex items-center gap-1.5 max-w-xs">
+                <AlertCircle className="size-3.5 shrink-0" />
+                <span className="truncate">Session expired</span>
+                <button
+                  onClick={() => { authService.logout(); }}
+                  className="underline ml-1 whitespace-nowrap hover:text-red-900"
+                >Re-login</button>
+              </span>
+            )}
+            {isOffline && !authError && (
               <span className="bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-xl text-[10px] font-bold flex items-center gap-1.5">
                 <AlertCircle className="size-3.5" /> Demo Mode
               </span>
             )}
+
             <button onClick={() => loadBookings(false)} title="Refresh"
               className="p-2 text-gray-400 hover:text-[#1e3d5a] hover:bg-gray-100 rounded-xl transition-all">
               <RefreshCw className={`size-5 ${isLoadingBookings ? 'animate-spin text-[#ee6b20]' : ''}`} />
@@ -600,8 +780,15 @@ export default function TellerHomePage() {
                         className="h-12 w-full pl-10 pr-4 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#ee6b20]/30 focus:border-[#ee6b20]"
                       />
                     </div>
-                    <button onClick={handleLookup} disabled={!scanInput.trim() || isLookingUp}
-                      className="h-12 w-12 bg-[#ee6b20] hover:bg-[#d95a10] disabled:opacity-50 rounded-xl flex items-center justify-center text-white transition-all shadow-sm hover:shadow-md">
+                    {/* Camera scanner button */}
+                    <button
+                      onClick={() => setShowScanner(true)}
+                      title="Scan barcode with camera"
+                      className="h-12 w-12 bg-[#1e3d5a] hover:bg-[#2a5373] rounded-xl flex items-center justify-center text-white transition-all shadow-sm hover:shadow-md shrink-0">
+                      <Camera className="size-4" />
+                    </button>
+                    <button onClick={() => handleLookup()} disabled={!scanInput.trim() || isLookingUp}
+                      className="h-12 w-12 bg-[#ee6b20] hover:bg-[#d95a10] disabled:opacity-50 rounded-xl flex items-center justify-center text-white transition-all shadow-sm hover:shadow-md shrink-0">
                       {isLookingUp ? <RefreshCw className="size-4 animate-spin" /> : <Search className="size-4" />}
                     </button>
                   </div>
@@ -793,6 +980,14 @@ export default function TellerHomePage() {
           onConfirm={confirmCheckOut}
           onCancel={() => setCheckoutTarget(null)}
           isLoading={isCheckingOut}
+        />
+      )}
+
+      {/* ── Live Barcode Scanner Modal ──────────────────────────────────────────── */}
+      {showScanner && (
+        <BarcodeScannerModal
+          onScan={handleScanResult}
+          onClose={() => setShowScanner(false)}
         />
       )}
 

@@ -1,0 +1,117 @@
+name: FE Multi Pipeline
+
+on:
+  push:
+    branches: [main, master, test]
+  pull_request:
+    branches: [main, master, test]
+
+jobs:
+  prepare:
+    name: Prepare Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      systems: ${{ steps.set-systems.outputs.systems }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set Systems
+        id: set-systems
+        run: |
+          if [ -z "${{ vars.FE_MULTI_SYSTEMS_JSON }}" ]; then
+            echo "FE_MULTI_SYSTEMS_JSON is not set. Using empty array."
+            echo "systems=[]" >> $GITHUB_OUTPUT
+          else
+            echo "systems=${{ vars.FE_MULTI_SYSTEMS_JSON }}" >> $GITHUB_OUTPUT
+          fi
+
+  build-test:
+    name: Build & Test (${{ matrix.system.name }})
+    needs: prepare
+    if: needs.prepare.outputs.systems != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        system: ${{ fromJson(needs.prepare.outputs.systems) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: './${{ matrix.system.dir }}/package-lock.json'
+
+      - name: Install Dependencies
+        run: |
+          cd ${{ matrix.system.dir }}
+          npm install
+
+      - name: Lint
+        run: |
+          cd ${{ matrix.system.dir }}
+          npm run lint
+
+      - name: Test
+        run: |
+          cd ${{ matrix.system.dir }}
+          npm run test
+
+      - name: Build
+        run: |
+          cd ${{ matrix.system.dir }}
+          npm run build
+
+  deploy:
+    name: Deploy & Notify (${{ matrix.system.name }})
+    needs: [prepare, build-test]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/test')
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        system: ${{ fromJson(needs.prepare.outputs.systems) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets[matrix.system.vercel_project_secret] }}
+          working-directory: ./${{ matrix.system.dir }}
+          vercel-args: '--prod'
+
+      - name: Notify Slack
+        if: always() && secrets.SLACK_WEBHOOK_URL != ''
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_MESSAGE: 'Deployment of ${{ matrix.system.name }} finished with status: ${{ job.status }}'
+
+      - name: Notify Discord
+        if: always() && secrets.DISCORD_WEBHOOK_URL != ''
+        uses: rjstone/discord-webhook-notify@v1
+        with:
+          severity: ${{ job.status == 'success' && 'info' || 'error' }}
+          details: 'Deployment of ${{ matrix.system.name }} finished with status: ${{ job.status }}'
+          webhookUrl: ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+  sonar:
+    name: SonarCloud Scan
+    needs: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: SonarCloud Scan
+        uses: sonarsource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

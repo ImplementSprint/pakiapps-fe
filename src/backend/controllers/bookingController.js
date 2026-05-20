@@ -11,12 +11,13 @@ const bookingService = require('../services/bookingService');
 const { Booking, Location } = require('../models/index');
 const { formatBooking }     = require('../utils/formatters');
 const { logBookingCheckOut } = require('../services/logService');
+const { getScopedHubIds } = require('../controllers/locationController');
 
 // POST /api/bookings
 const createBooking = async (req, res) => {
   try {
     const booking = await bookingService.createBooking({
-      userId: req.user.id,
+      userId: req.user.authId,
       ...req.body,
     });
     res.status(201).json({ success: true, data: booking });
@@ -29,18 +30,34 @@ const createBooking = async (req, res) => {
 const getMyBookings = async (req, res) => {
   try {
     const { status, search, page, limit } = req.query;
-    const result = await bookingService.getUserBookings(req.user.id, { status, search, page, limit });
+    const result = await bookingService.getUserBookings(req.user.authId, { status, search, page, limit });
     res.json({ success: true, data: result });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// GET /api/bookings (admin / teller)
+// GET /api/bookings (admin / teller / business_partner)
 const getAllBookings = async (req, res) => {
   try {
-    const { status, search, date, locationId, page, limit } = req.query;
-    const result = await bookingService.getAllBookings({ status, search, date, locationId, page, limit });
+    const { status, search, date, page, limit } = req.query;
+    let { locationId } = req.query;
+
+    // Scope non-admin roles to their own hub(s) via UUID location_id
+    const scoped = await getScopedHubIds(req.user);
+    let hubIds = null;
+    if (scoped !== null) {
+      if (scoped.hubIds.length === 0) {
+        return res.json({ success: true, data: { bookings: [], total: 0, page: 1, totalPages: 0 } });
+      }
+      // If caller also supplied a locationId filter, validate it is within scope
+      if (locationId && !scoped.hubIds.includes(locationId)) {
+        return res.status(403).json({ success: false, message: 'Access denied to that location.' });
+      }
+      hubIds = scoped.hubIds;  // UUID[]
+    }
+
+    const result = await bookingService.getAllBookings({ status, search, date, locationId, hubIds, page, limit });
     res.json({ success: true, data: result });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

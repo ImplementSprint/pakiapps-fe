@@ -289,7 +289,7 @@ function DeleteAccountModal({ onClose }: { onClose: () => void }) {
 export default function ProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState({
-    name: '', email: '', phone: '', dateOfBirth: '', address: '', profilePicture: '',
+    firstName: '', lastName: '', email: '', phone: '', dateOfBirth: '', address: '', profilePicture: '',
   });
   const [serverData, setServerData]   = useState<any>(null);
   const [preferences, setPreferences] = useState({ emailNotifications: true, smsUpdates: true, autoExtend: false });
@@ -303,8 +303,12 @@ export default function ProfilePage() {
   useEffect(() => {
     usersService.getProfile().then(p => {
       setServerData(p);
+      const nameParts = (p.name || '').trim().split(/\s+/);
+      const firstName = nameParts[0] || '';
+      const lastName  = nameParts.slice(1).join(' ') || '';
       setProfile({
-        name:           p.name || '',
+        firstName,
+        lastName,
         email:          p.email || '',
         phone:          p.phone || '',
         dateOfBirth:    p.dateOfBirth || '',
@@ -319,8 +323,10 @@ export default function ProfilePage() {
         created:        p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-PH', { month: 'short', year: 'numeric' }) : '',
       });
     }).catch(() => {
+      const stored = (localStorage.getItem('userName') || '').trim().split(/\s+/);
       setProfile({
-        name:           localStorage.getItem('userName') || '',
+        firstName:      stored[0] || '',
+        lastName:       stored.slice(1).join(' ') || '',
         email:          localStorage.getItem('userEmail') || '',
         phone:          localStorage.getItem('userPhone') || '',
         dateOfBirth:    '',
@@ -341,8 +347,9 @@ export default function ProfilePage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const fullName = `${profile.firstName} ${profile.lastName}`.trim();
       const updated = await usersService.updateProfile({
-        name:        profile.name,
+        name:        fullName,
         phone:       profile.phone,
         address:     profile.address,
         dateOfBirth: profile.dateOfBirth,
@@ -350,7 +357,7 @@ export default function ProfilePage() {
         preferences,
       });
       setServerData(updated);
-      localStorage.setItem('userName',  profile.name);
+      localStorage.setItem('userName',  fullName);
       localStorage.setItem('userEmail', profile.email);
       localStorage.setItem('userPhone', profile.phone);
       if (profile.profilePicture) localStorage.setItem('userProfilePic', profile.profilePicture);
@@ -457,7 +464,7 @@ export default function ProfilePage() {
                   {profile.profilePicture ? (
                     <Image src={profile.profilePicture} alt="Avatar" fill className="object-cover" unoptimized />
                   ) : (
-                    profile.name.charAt(0).toUpperCase() || 'U'
+                    (profile.firstName || profile.lastName || 'U').charAt(0).toUpperCase()
                   )}
                 </div>
                 <label className="absolute bottom-1 right-1 size-9 bg-[#ee6b20] text-white rounded-full flex items-center justify-center hover:bg-[#d95a10] border-[3px] border-white shadow-sm transition-colors cursor-pointer">
@@ -476,7 +483,9 @@ export default function ProfilePage() {
                   }} />
                 </label>
               </div>
-              <h2 className="text-2xl font-black text-[#1e3d5a]">{profile.name || 'New User'}</h2>
+              <h2 className="text-2xl font-black text-[#1e3d5a]">
+                {profile.firstName || profile.lastName ? `${profile.firstName} ${profile.lastName}`.trim() : 'New User'}
+              </h2>
               <p className="text-gray-500 font-medium mb-3">
                 {discountStatus === 'approved' ? `${discountPct}% Discount Customer` : 'Regular Customer'}
               </p>
@@ -588,12 +597,31 @@ export default function ProfilePage() {
               </div>
 
               <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* First Name */}
                 <div className="space-y-2">
                   <label className="text-xs font-black tracking-widest text-[#1e3d5a] uppercase flex items-center gap-2">
-                    <User className="size-4 text-gray-400" /> Full Name
+                    <User className="size-4 text-gray-400" /> First Name
                   </label>
-                  <Input value={profile.name} onChange={e => setProfile({ ...profile, name: e.target.value })} disabled={!isEditing}
-                    placeholder="Enter your full name" className="h-12 bg-gray-50/50 border-gray-100 rounded-xl focus-visible:ring-[#ee6b20] font-medium" />
+                  <Input
+                    value={profile.firstName}
+                    onChange={e => setProfile({ ...profile, firstName: e.target.value })}
+                    disabled={!isEditing}
+                    placeholder="e.g. Juan"
+                    className="h-12 bg-gray-50/50 border-gray-100 rounded-xl focus-visible:ring-[#ee6b20] font-medium"
+                  />
+                </div>
+                {/* Last Name */}
+                <div className="space-y-2">
+                  <label className="text-xs font-black tracking-widest text-[#1e3d5a] uppercase flex items-center gap-2">
+                    <User className="size-4 text-gray-400" /> Last Name
+                  </label>
+                  <Input
+                    value={profile.lastName}
+                    onChange={e => setProfile({ ...profile, lastName: e.target.value })}
+                    disabled={!isEditing}
+                    placeholder="e.g. Dela Cruz"
+                    className="h-12 bg-gray-50/50 border-gray-100 rounded-xl focus-visible:ring-[#ee6b20] font-medium"
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-black tracking-widest text-[#1e3d5a] uppercase flex items-center gap-2">

@@ -17,7 +17,7 @@ export const parkingSlotService = {
   },
   
   async getAvailableSlots(locationId: string, date: string, timeSlot: string): Promise<ParkingSlot[]> {
-    const res = await api.get(`/parking-slots/location/${locationId}/available?date=${date}&timeSlot=${encodeURIComponent(timeSlot)}`);
+    const res = await api.get(`/parking-slots/available/${locationId}?date=${date}&timeSlot=${encodeURIComponent(timeSlot)}`);
     return res.data;
   },
 
@@ -37,8 +37,11 @@ export const parkingSlotService = {
   },
 
   async getDashboardSlots(locationId: string, date: string) {
-    const res = await api.get(`/parking-slots/location/${locationId}/dashboard?date=${date}`);
-    return res.data;
+    const res = await api.get(`/parking-slots/dashboard/${locationId}?date=${date}`);
+    return {
+      slots: res.data || [],
+      recommendedPollMs: res.recommendedPollMs || 60000,
+    };
   },
 
   async generateSlots(data: { locationId: string; sections?: string[]; slotsPerSection?: number; floors?: number; slots?: any[] }) {
