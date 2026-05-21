@@ -1,31 +1,22 @@
-const { Sequelize } = require('sequelize');
-require('dotenv').config();
+const { sequelize } = require('./config/db');
 
-async function checkSchema() {
-  const sequelize = new Sequelize(process.env.DATABASE_URL, {
-    dialect: 'postgres',
-    dialectOptions: { ssl: { require: true, rejectUnauthorized: false } },
-    logging: false
-  });
-
+async function inspect() {
   try {
-    const [bookings] = await sequelize.query("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'reservation' AND table_name = 'bookings'");
-    console.log('--- reservation.bookings ---');
-    console.table(bookings);
+    const [profiles] = await sequelize.query("SELECT column_name FROM information_schema.columns WHERE table_schema = 'account' AND table_name = 'profiles' ORDER BY ordinal_position");
+    console.log('account.profiles:', profiles.map(c => c.column_name));
 
-    const [users] = await sequelize.query("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'account' AND table_name = 'users'");
-    console.log('--- account.users ---');
-    console.table(users);
+    const [bookings] = await sequelize.query("SELECT column_name FROM information_schema.columns WHERE table_schema = 'reservation' AND table_name = 'bookings' ORDER BY ordinal_position");
+    console.log('reservation.bookings:', bookings.map(c => c.column_name));
+    
+    const [users] = await sequelize.query("SELECT table_schema, table_name FROM information_schema.tables WHERE table_name = 'users'");
+    console.log('users tables in database:', users);
 
-    const [locations] = await sequelize.query("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'parking_lot' AND table_name = 'locations'");
-    console.log('--- parking_lot.locations ---');
-    console.table(locations);
-
+    const [profilesTables] = await sequelize.query("SELECT table_schema, table_name FROM information_schema.tables WHERE table_name = 'profiles'");
+    console.log('profiles tables in database:', profilesTables);
   } catch (err) {
     console.error(err);
   } finally {
     await sequelize.close();
   }
 }
-
-checkSchema();
+inspect();

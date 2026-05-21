@@ -183,7 +183,7 @@ export default function FindParkingPage() {
         {!isLoading && !error && filtered.length > 0 && (
           <div className="space-y-4">
             {filtered.map(loc => (
-              <div key={loc._id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+              <div key={loc.id || loc._id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
                 <div className="flex flex-col sm:flex-row">
                   <div className="bg-gradient-to-b from-[#1e3d5a] to-[#2a5373] sm:w-3 w-full sm:h-auto h-2 shrink-0" />
                   <div className="flex-1 p-5 sm:p-6 flex flex-col lg:flex-row gap-5">

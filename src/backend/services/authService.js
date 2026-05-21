@@ -4,7 +4,6 @@
  * ==============================================
  * Auth credentials live in Supabase auth.users.
  * Identity/profile data lives in account.profiles (PRIMARY).
- * Role/verified data lives in account.users (via supabaseId).
  *
  * ❌ NO public schema usage — public.users is NOT touched anywhere here.
  */
@@ -27,113 +26,65 @@ function isPhoneIdentifier(val) {
 // ── account.profiles (PRIMARY) ────────────────────────────────────────────────
 
 /**
- * Upsert into account.profiles using first_name + last_name columns.
+ * Upsert into account.profiles using full_name column.
  * id = Supabase auth UUID.
  */
 async function upsertAccountProfile(authId, data = {}) {
   const firstName = (data.firstName || '').trim();
   const lastName  = (data.lastName  || '').trim();
+  const fullName  = `${firstName} ${lastName}`.trim() || data.name || data.email || '';
 
   await sequelize.query(
-    `INSERT INTO account.profiles (id, first_name, last_name, email, phone, dob)
-     VALUES (:id, :firstName, :lastName, :email, :phone, :dob)
+    `INSERT INTO account.profiles (id, full_name, email, phone, dob, role, is_verified)
+     VALUES (:id, :fullName, :email, :phone, :dob, :role, :isVerified)
      ON CONFLICT (id) DO UPDATE
-       SET first_name = COALESCE(EXCLUDED.first_name, account.profiles.first_name),
-           last_name  = COALESCE(EXCLUDED.last_name,  account.profiles.last_name),
-           email      = COALESCE(EXCLUDED.email,      account.profiles.email),
-           phone      = COALESCE(EXCLUDED.phone,      account.profiles.phone),
-           dob        = COALESCE(EXCLUDED.dob,        account.profiles.dob)`,
+       SET full_name   = COALESCE(EXCLUDED.full_name, account.profiles.full_name),
+           email       = COALESCE(EXCLUDED.email,     account.profiles.email),
+           phone       = COALESCE(EXCLUDED.phone,     account.profiles.phone),
+           dob         = COALESCE(EXCLUDED.dob,       account.profiles.dob),
+           role        = COALESCE(EXCLUDED.role,      account.profiles.role),
+           is_verified = COALESCE(EXCLUDED.is_verified, account.profiles.is_verified)`,
     {
       replacements: {
-        id:        authId,
-        firstName: firstName || null,
-        lastName:  lastName  || null,
-        email:     data.email ?? null,
-        phone:     data.phone ?? null,
-        dob:       data.dob   ?? null,
+        id:         authId,
+        fullName:   fullName || null,
+        email:      data.email ?? null,
+        phone:      data.phone ?? null,
+        dob:        data.dob   ?? null,
+        role:       data.role  || 'customer',
+        isVerified: data.isVerified ?? false,
       },
     },
   );
-  console.log(`[Auth] ✅ account.profiles → ${authId} (${firstName} ${lastName})`);
+  console.log(`[Auth] ✅ account.profiles → ${authId} (${fullName})`);
 }
 
 /**
- * Upsert into account.users for role/isVerified data.
- * Links by supabaseId (UUID from auth.users).
+ * Keep for compatibility, delegates directly to upsertAccountProfile.
  */
 async function upsertAccountUser(authId, data = {}) {
-  const firstName = data.firstName || '';
-  const lastName  = data.lastName  || '';
-  const name      = `${firstName} ${lastName}`.trim() || data.email || authId;
-  try {
-    // Check if the row already exists
-    const [existing] = await sequelize.query(
-      `SELECT id FROM account.users WHERE "supabaseId" = :authId LIMIT 1`,
-      { replacements: { authId } }
-    );
-    if (existing.length > 0) {
-      // UPDATE existing row
-      await sequelize.query(
-        `UPDATE account.users
-         SET name = :name, email = COALESCE(:email, email), phone = COALESCE(:phone, phone),
-             role = COALESCE(:role, role), "updatedAt" = now()
-         WHERE "supabaseId" = :authId`,
-        {
-          replacements: {
-            authId,
-            name,
-            email: data.email ?? null,
-            phone: data.phone ?? null,
-            role:  data.role  || 'customer',
-          },
-        }
-      );
-    } else {
-      // INSERT new row
-      await sequelize.query(
-        `INSERT INTO account.users
-           (name, email, phone, role, "isVerified", "supabaseId", password, "createdAt", "updatedAt")
-         VALUES (:name, :email, :phone, :role, :isVerified, :authId, :password, now(), now())`,
-        {
-          replacements: {
-            authId,
-            name,
-            email:      data.email      ?? null,
-            phone:      data.phone      ?? null,
-            role:       data.role       || 'customer',
-            isVerified: data.isVerified ?? false,
-            password:   '[SUPABASE_MANAGED]',
-          },
-        }
-      );
-    }
-    console.log(`[Auth] ✅ account.users → ${authId} (role: ${data.role || 'customer'})`);
-  } catch (err) {
-    console.warn('[Auth] account.users upsert failed (non-fatal):', err.message);
-  }
+  await upsertAccountProfile(authId, data);
 }
 
 /**
  * Read profile from account.profiles by Supabase auth UUID.
- * LEFT JOINs account.users to get role, isVerified, profilePicture.
- * ❌ NO public.users reference.
  */
 async function getProfileByAuthId(authId) {
   const [rows] = await sequelize.query(
     `SELECT
-       ap.id            AS auth_id,
-       ap.first_name,
-       ap.last_name,
-       ap.email         AS ap_email,
-       ap.phone         AS ap_phone,
-       ap.dob           AS ap_dob,
-       u.id             AS public_id,
-       u.role,
-       u."isVerified",
-       u."profilePicture"
-     FROM account.profiles ap
-     LEFT JOIN account.users u ON u."supabaseId" = ap.id
-     WHERE ap.id = :authId
+       id               AS auth_id,
+       full_name        AS name,
+       full_name        AS first_name,
+       ''               AS last_name,
+       email            AS ap_email,
+       phone            AS ap_phone,
+       dob              AS ap_dob,
+       id               AS public_id,
+       role,
+       is_verified      AS "isVerified",
+       profile_picture  AS "profilePicture"
+     FROM account.profiles
+     WHERE id = :authId
      LIMIT 1`,
     { replacements: { authId } },
   );
@@ -142,24 +93,23 @@ async function getProfileByAuthId(authId) {
 
 /**
  * Fallback: find by email in account.profiles.
- * LEFT JOINs account.users for role.
  */
 async function getProfileByEmail(email) {
   const [rows] = await sequelize.query(
     `SELECT
-       ap.id            AS auth_id,
-       ap.first_name,
-       ap.last_name,
-       ap.email         AS ap_email,
-       ap.phone         AS ap_phone,
-       ap.dob           AS ap_dob,
-       u.id             AS public_id,
-       u.role,
-       u."isVerified",
-       u."profilePicture"
-     FROM account.profiles ap
-     LEFT JOIN account.users u ON u."supabaseId" = ap.id
-     WHERE ap.email = :email
+       id               AS auth_id,
+       full_name        AS name,
+       full_name        AS first_name,
+       ''               AS last_name,
+       email            AS ap_email,
+       phone            AS ap_phone,
+       dob              AS ap_dob,
+       id               AS public_id,
+       role,
+       is_verified      AS "isVerified",
+       profile_picture  AS "profilePicture"
+     FROM account.profiles
+     WHERE email = :email
      LIMIT 1`,
     { replacements: { email } },
   );
@@ -233,17 +183,7 @@ const registerCustomer = async ({ firstName, lastName, email, phone, password })
     phone: actualPhone,
   });
 
-  // ── Step 5: Sync to account.users (role store) ───────────────────────────
-  await upsertAccountUser(authUser.id, {
-    firstName,
-    lastName,
-    email: isPhoneReg ? null : authEmail,
-    phone: actualPhone,
-    role: 'customer',
-    isVerified: false,
-  });
-
-  // ── Step 6: Sign in to get session token ─────────────────────────────────
+  // ── Step 5: Sign in to get session token ─────────────────────────────────
   const { data: session, error: signInError } = await supabase.auth.signInWithPassword({
     email: authEmail,
     password,
@@ -279,8 +219,7 @@ const registerAdmin = async ({ firstName, lastName, email, phone, password, acce
 
   const authUser = authData.user;
 
-  await upsertAccountProfile(authUser.id, { firstName, lastName, email: authUser.email, phone });
-  await upsertAccountUser(authUser.id, { firstName, lastName, email: authUser.email, phone, role: finalRole, isVerified: true });
+  await upsertAccountProfile(authUser.id, { firstName, lastName, email: authUser.email, phone, role: finalRole, isVerified: true });
 
   const { data: session, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
   if (signInError) throw new Error(signInError.message);
@@ -326,8 +265,7 @@ const loginUser = async ({ email, password }) => {
       // Derive role from app_metadata (safe — not user-editable)
       const role   = authUser.app_metadata?.role || 'customer';
 
-      await upsertAccountProfile(authUser.id, { firstName: fName, lastName: lName, email: realEmail, phone: meta.phone || null });
-      await upsertAccountUser(authUser.id, { firstName: fName, lastName: lName, email: authUser.email, phone: meta.phone || null, role, isVerified: true });
+      await upsertAccountProfile(authUser.id, { firstName: fName, lastName: lName, email: realEmail, phone: meta.phone || null, role, isVerified: true });
       profile = await getProfileByAuthId(authUser.id);
     }
   }
@@ -351,8 +289,9 @@ const loginUser = async ({ email, password }) => {
 // ── Build Response ────────────────────────────────────────────────────────────
 
 function buildResponse(profile, authId, session) {
-  const firstName = profile.first_name || '';
-  const lastName  = profile.last_name  || '';
+  const name = profile.name || profile.full_name || '';
+  const firstName = name.split(' ')[0] || '';
+  const lastName  = name.split(' ').slice(1).join(' ') || '';
 
   const isSynthetic  = profile.ap_email &&
     (profile.ap_email.endsWith('@phone.pakipark.local') || profile.ap_email.endsWith('@pakipark.ph'));
@@ -365,7 +304,7 @@ function buildResponse(profile, authId, session) {
     authId,
     firstName,
     lastName,
-    name:           `${firstName} ${lastName}`.trim(),
+    name:           name,
     email:          displayEmail,
     phone:          displayPhone,
     dob:            profile.ap_dob || null,

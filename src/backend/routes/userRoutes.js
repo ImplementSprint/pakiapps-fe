@@ -13,6 +13,8 @@ const {
   verify2FA,
   disable2FA,
   getAllUsers,
+  requestVerificationOTP,
+  verifyAccountOTP,
 } = require('../controllers/userController');
 
 // ── Customer profile ──────────────────────────────────────────────────────────
@@ -20,6 +22,10 @@ router.get('/profile',         protect, getProfile);
 router.put('/profile',         protect, updateProfile);
 router.put('/password',        protect, changePassword);
 router.delete('/account',      protect, deleteAccount);  // soft-delete own account
+
+// ── Account Verification ──────────────────────────────────────────────────────
+router.post('/verify-account/request', protect, requestVerificationOTP);
+router.post('/verify-account/verify', protect, verifyAccountOTP);
 
 // ── Special discount (PWD / Senior Citizen) ───────────────────────────────────
 router.post('/discount-request',        protect, submitDiscountRequest);   // customer uploads ID

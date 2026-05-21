@@ -19,20 +19,22 @@ const Location = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
     },
     // FK to account.users.supabaseId — identifies the Business Partner owner
-    partner_user_id: { type: DataTypes.UUID, allowNull: true },
+    partnerUserId: { type: DataTypes.UUID, allowNull: true, field: 'owner_id' },
     name:          { type: DataTypes.STRING, allowNull: false },
     address:       { type: DataTypes.STRING, allowNull: false },
     lat:           { type: DataTypes.FLOAT,  allowNull: true },
     lng:           { type: DataTypes.FLOAT,  allowNull: true },
     amenities:     { type: DataTypes.ARRAY(DataTypes.STRING), allowNull: true },
-    totalSpots:    { type: DataTypes.INTEGER, defaultValue: 0 },
-    availableSpots:{ type: DataTypes.INTEGER, defaultValue: 0 },
-    hourlyRate:    { type: DataTypes.FLOAT, defaultValue: 0 }, // still denormalized here for easy reads, but also managed in parking_rates
+    totalSpots:    { type: DataTypes.INTEGER, defaultValue: 0, field: 'total_spots' },
+    availableSpots:{ type: DataTypes.INTEGER, defaultValue: 0, field: 'available_spots' },
+    hourlyRate:    { type: DataTypes.FLOAT, defaultValue: 0, field: 'pricePerHour' },
     status:        { type: DataTypes.STRING, defaultValue: 'active' },
-    operatingHours:{ type: DataTypes.JSONB, allowNull: true },
-    operatingHoursJson:{ type: DataTypes.JSONB, allowNull: true },
-    createdAt:     { type: DataTypes.DATE, allowNull: true },
-    updatedAt:     { type: DataTypes.DATE, allowNull: true }
+    operatingHoursJson: { type: DataTypes.JSONB, allowNull: true, field: 'operatingHours' },
+    createdAt:     { type: DataTypes.DATE, allowNull: true, field: 'created_at' },
+    updatedAt:     { type: DataTypes.DATE, allowNull: true }, // exact match
+    coordinates:   { type: DataTypes.JSONB, allowNull: true },
+    imageUrl:      { type: DataTypes.TEXT, allowNull: true, field: 'image_url' },
+    isActive:      { type: DataTypes.BOOLEAN, defaultValue: true, field: 'is_active' }
   },
   {
     tableName:  'locations',

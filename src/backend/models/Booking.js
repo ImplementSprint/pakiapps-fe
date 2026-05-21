@@ -37,7 +37,7 @@ const Booking = sequelize.define(
       defaultValue: 'Pending',
     },
     amount:      { type: DataTypes.FLOAT, allowNull: false },
-    finalAmount: { type: DataTypes.FLOAT, allowNull: true },
+    finalAmount: { type: DataTypes.VIRTUAL },
     paymentMethod: {
       type: DataTypes.ENUM('GCash', 'PayMaya', 'Credit/Debit Card', 'gcash_linked'),
       allowNull: false,
@@ -58,18 +58,18 @@ const Booking = sequelize.define(
     // ── Lifecycle timestamps ──────────────────────────────────────────────────
     checkInAt:      { type: DataTypes.DATE, allowNull: true },
     checkOutAt:     { type: DataTypes.DATE, allowNull: true },
-    cancelledAt:    { type: DataTypes.DATE, allowNull: true },
-    cancelReason:   { type: DataTypes.TEXT, allowNull: true },
-    reminderSentAt: { type: DataTypes.DATE, allowNull: true },
+    cancelledAt:    { type: DataTypes.VIRTUAL },
+    cancelReason:   { type: DataTypes.VIRTUAL },
+    reminderSentAt: { type: DataTypes.VIRTUAL },
 
-    // ── User snapshot ─────────────────────────────────────────────────────────
-    userName:  { type: DataTypes.STRING(120), allowNull: true },
-    userEmail: { type: DataTypes.STRING(200), allowNull: true },
-    userPhone: { type: DataTypes.STRING(30),  allowNull: true },
+    // ── User snapshot (Virtual for backward compatibility) ────────────────────
+    userName:  { type: DataTypes.VIRTUAL },
+    userEmail: { type: DataTypes.VIRTUAL },
+    userPhone: { type: DataTypes.VIRTUAL },
 
     // ── Vehicle snapshot ──────────────────────────────────────────────────────
-    vehicleBrand: { type: DataTypes.STRING(60),  allowNull: true },
-    vehicleModel: { type: DataTypes.STRING(60),  allowNull: true },
+    vehicleBrand: { type: DataTypes.VIRTUAL },
+    vehicleModel: { type: DataTypes.VIRTUAL },
     vehiclePlate: { type: DataTypes.STRING(20),  allowNull: true },
     vehicleType:  { type: DataTypes.STRING(20),  allowNull: true },
     vehicleColor: { type: DataTypes.STRING(30),  allowNull: true },
@@ -85,14 +85,6 @@ const Booking = sequelize.define(
     indexes: [
       { name: 'res_bookings_reference_unique',    unique: true, fields: ['reference'] },
       { name: 'res_bookings_barcode_unique',      unique: true, fields: ['barcode'] },
-      { name: 'idx_res_bookings_location_date',   fields: ['locationId', 'date', 'status'] },
-      { name: 'idx_res_bookings_slot_date',       fields: ['parkingSlotId', 'date', 'status'] },
-      { name: 'idx_res_bookings_user_createdat',  fields: ['userId', 'createdAt'] },
-      { name: 'idx_res_bookings_user_status',     fields: ['userId', 'status'] },
-      { name: 'idx_res_bookings_date',            fields: ['date'] },
-      { name: 'idx_res_bookings_status',          fields: ['status'] },
-      { name: 'idx_res_bookings_location_status', fields: ['locationId', 'status'] },
-      { name: 'idx_res_bookings_vehicle_type',    fields: ['vehicleType'] },
     ],
   }
 );

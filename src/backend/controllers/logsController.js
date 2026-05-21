@@ -77,7 +77,7 @@ const getTransactionStats = async (req, res) => {
         `SELECT "paymentMethod" AS method,
                 COUNT(*)::int   AS count,
                 SUM(amount)::float AS total
-         FROM transaction_logs
+         FROM reservation.transaction_logs
          WHERE status = 'success'
          GROUP BY "paymentMethod"
          ORDER BY count DESC`,
@@ -89,7 +89,7 @@ const getTransactionStats = async (req, res) => {
         `SELECT "transactionType" AS type,
                 COUNT(*)::int    AS count,
                 SUM(amount)::float AS total
-         FROM transaction_logs
+         FROM reservation.transaction_logs
          GROUP BY "transactionType"
          ORDER BY count DESC`,
         { type: QueryTypes.SELECT }
@@ -100,7 +100,7 @@ const getTransactionStats = async (req, res) => {
         `SELECT TO_CHAR(DATE_TRUNC('month', "createdAt"), 'YYYY-MM') AS month,
                 COUNT(*)::int      AS transactions,
                 SUM(amount)::float AS revenue
-         FROM transaction_logs
+         FROM reservation.transaction_logs
          WHERE status = 'success'
            AND "transactionType" = 'payment'
            AND "createdAt" >= NOW() - INTERVAL '6 months'
@@ -169,7 +169,7 @@ const getActivityStats = async (req, res) => {
     const [bySeverity, byAction, byEntity, recentCritical] = await Promise.all([
       sequelize.query(
         `SELECT severity, COUNT(*)::int AS count
-         FROM activity_logs
+         FROM partner.activity_logs
          GROUP BY severity
          ORDER BY count DESC`,
         { type: QueryTypes.SELECT }
@@ -177,7 +177,7 @@ const getActivityStats = async (req, res) => {
 
       sequelize.query(
         `SELECT action, COUNT(*)::int AS count
-         FROM activity_logs
+         FROM partner.activity_logs
          GROUP BY action
          ORDER BY count DESC
          LIMIT 10`,
@@ -186,7 +186,7 @@ const getActivityStats = async (req, res) => {
 
       sequelize.query(
         `SELECT "entityType", COUNT(*)::int AS count
-         FROM activity_logs
+         FROM partner.activity_logs
          WHERE "entityType" IS NOT NULL
          GROUP BY "entityType"
          ORDER BY count DESC`,

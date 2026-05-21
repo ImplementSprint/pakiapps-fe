@@ -3,6 +3,9 @@ import { api } from '../lib/api';
 export const authService = {
   async login(email: string, password: string) {
     const res = await api.post('/auth/login', { email, password });
+    if (!res.success) {
+      throw new Error(res.message || 'Login failed');
+    }
     const user = res.data;
     if (typeof window !== 'undefined' && user?.token) {
       localStorage.setItem('authToken',       user.token);
@@ -29,6 +32,9 @@ export const authService = {
 
   async register(data: { firstName: string; lastName: string; email?: string; phone?: string; password: string }) {
     const res = await api.post('/auth/register/customer', data);
+    if (!res.success) {
+      throw new Error(res.message || 'Registration failed');
+    }
     return res.data;
   },
 

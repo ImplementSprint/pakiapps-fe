@@ -285,6 +285,228 @@ function DeleteAccountModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ─── Account Verification Modal ───────────────────────────────────────────────
+function AccountVerificationModal({
+   onClose,
+  onVerified,
+  userEmail,
+  userPhone,
+  hasPersonalFields,
+}: {
+  onClose: () => void;
+  onVerified: () => void;
+  userEmail: string;
+  userPhone: string;
+  hasPersonalFields: boolean;
+}) {
+  const [step, setStep] = useState<'select' | 'code'>('select');
+  const [channel, setChannel] = useState<'email' | 'sms'>('email');
+  const [otpVal, setOtpVal] = useState<string[]>(new Array(6).fill(''));
+  const [loading, setLoading] = useState(false);
+  const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
+
+  const handleSendOTP = async (selectedChannel: 'email' | 'sms') => {
+    if (!hasPersonalFields) {
+      toast.error('Please complete all personal fields (Name, Phone, Birth Date, and Address) on your profile first!');
+      return;
+    }
+    setLoading(true);
+    setChannel(selectedChannel);
+    setOtpVal(new Array(6).fill(''));
+    try {
+      const res = await usersService.requestVerificationOTP(selectedChannel);
+      if (res.success) {
+        toast.success(res.message || 'OTP sent successfully!');
+        setStep('code');
+        setTimeout(() => {
+          inputRefs.current[0]?.focus();
+        }, 150);
+      } else {
+        toast.error(res.message || 'Failed to send OTP.');
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Error sending OTP.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (val: string, idx: number) => {
+    const cleaned = val.replace(/\D/g, '');
+    if (!cleaned) {
+      const newOtp = [...otpVal];
+      newOtp[idx] = '';
+      setOtpVal(newOtp);
+      return;
+    }
+
+    const newOtp = [...otpVal];
+    // Pasted 6 digit code
+    if (cleaned.length > 1) {
+      const pasted = cleaned.slice(0, 6).split('');
+      const filledOtp = [...otpVal];
+      pasted.forEach((char, i) => {
+        filledOtp[i] = char;
+        if (inputRefs.current[i]) {
+          inputRefs.current[i]!.value = char;
+        }
+      });
+      setOtpVal(filledOtp);
+      const nextFocus = Math.min(pasted.length, 5);
+      inputRefs.current[nextFocus]?.focus();
+      return;
+    }
+
+    newOtp[idx] = cleaned;
+    setOtpVal(newOtp);
+
+    // Auto-focus next input box
+    if (idx < 5 && cleaned) {
+      inputRefs.current[idx + 1]?.focus();
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
+    if (e.key === 'Backspace') {
+      if (!otpVal[idx] && idx > 0) {
+        const newOtp = [...otpVal];
+        newOtp[idx - 1] = '';
+        setOtpVal(newOtp);
+        inputRefs.current[idx - 1]?.focus();
+      } else {
+        const newOtp = [...otpVal];
+        newOtp[idx] = '';
+        setOtpVal(newOtp);
+      }
+    }
+  };
+
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const code = otpVal.join('');
+    if (code.length < 6) {
+      toast.error('Please enter all 6 digits of the OTP code.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await usersService.verifyAccountOTP(code);
+      if (res.success) {
+        toast.success('🎉 Account successfully verified!');
+        onVerified();
+        onClose();
+      } else {
+        toast.error(res.message || 'Incorrect OTP code.');
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Verification failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="size-10 bg-green-50 rounded-xl flex items-center justify-center">
+              <ShieldCheck className="size-5 text-green-600" />
+            </div>
+            <h2 className="text-xl font-black text-[#1e3d5a]">Verify Account</h2>
+          </div>
+          <button onClick={onClose} className="size-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center">
+            <X className="size-4 text-gray-500" />
+          </button>
+        </div>
+
+        {step === 'select' && (
+          <div className="space-y-6">
+            <p className="text-sm text-gray-600">
+              Choose how you want to receive your 6-digit verification code. Please make sure your contact details are updated.
+            </p>
+            <div className="grid grid-cols-1 gap-3">
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => handleSendOTP('email')}
+                className="w-full p-4 border border-gray-100 hover:border-blue-100 rounded-2xl bg-gray-50 hover:bg-blue-50/30 flex items-center gap-4 transition-all text-left group"
+              >
+                <div className="size-12 rounded-xl bg-blue-100 text-[#1e3d5a] flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Mail className="size-6 text-[#1e3d5a]" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-[#1e3d5a] text-sm">Send to Email</h4>
+                  <p className="text-xs text-gray-500 font-medium mt-0.5">{userEmail || 'No email configured'}</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => handleSendOTP('sms')}
+                className="w-full p-4 border border-gray-100 hover:border-amber-100 rounded-2xl bg-gray-50 hover:bg-amber-50/30 flex items-center gap-4 transition-all text-left group"
+              >
+                <div className="size-12 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Phone className="size-6 text-amber-600" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-[#1e3d5a] text-sm">Send via SMS</h4>
+                  <p className="text-xs text-gray-500 font-medium mt-0.5">{userPhone || 'No phone configured'}</p>
+                </div>
+              </button>
+            </div>
+            {loading && <p className="text-xs text-center text-gray-400 font-bold">Sending code...</p>}
+          </div>
+        )}
+
+        {step === 'code' && (
+          <form onSubmit={handleVerifyOTP} className="space-y-6">
+            <p className="text-sm text-gray-600">
+              We've sent a 6-digit code to your <strong>{channel === 'email' ? 'Email Address' : 'Mobile Number'}</strong>. Please enter the code below to complete verification.
+            </p>
+            <div className="space-y-3">
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider text-center">
+                6-Digit Verification Code
+              </label>
+              <div className="flex justify-center gap-2">
+                {[0, 1, 2, 3, 4, 5].map((idx) => (
+                  <input
+                    key={idx}
+                    ref={(el) => { inputRefs.current[idx] = el; }}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={idx === 0 ? 6 : 1}
+                    value={otpVal[idx] || ''}
+                    onChange={(e) => handleChange(e.target.value, idx)}
+                    onKeyDown={(e) => handleKeyDown(e, idx)}
+                    className="size-12 md:size-14 text-center text-2xl font-black text-[#1e3d5a] bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-[#10b981] focus:bg-white focus:outline-none transition-all shadow-sm"
+                  />
+                ))}
+              </div>
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-black rounded-xl transition-colors disabled:opacity-60"
+            >
+              {loading ? 'Verifying...' : 'Verify & Activate Account'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setStep('select')}
+              className="w-full text-xs text-center font-bold text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              Didn't get a code? Choose another option
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Profile Page ────────────────────────────────────────────────────────
 export default function ProfilePage() {
   const router = useRouter();
@@ -304,8 +526,15 @@ export default function ProfilePage() {
     usersService.getProfile().then(p => {
       setServerData(p);
       const nameParts = (p.name || '').trim().split(/\s+/);
-      const firstName = nameParts[0] || '';
-      const lastName  = nameParts.slice(1).join(' ') || '';
+      let firstName = '';
+      let lastName = '';
+      if (nameParts.length > 1) {
+        lastName  = nameParts[nameParts.length - 1];
+        firstName = nameParts.slice(0, -1).join(' ');
+      } else {
+        firstName = nameParts[0] || '';
+        lastName  = '';
+      }
       setProfile({
         firstName,
         lastName,
@@ -324,9 +553,18 @@ export default function ProfilePage() {
       });
     }).catch(() => {
       const stored = (localStorage.getItem('userName') || '').trim().split(/\s+/);
+      let firstName = '';
+      let lastName = '';
+      if (stored.length > 1) {
+        lastName  = stored[stored.length - 1];
+        firstName = stored.slice(0, -1).join(' ');
+      } else {
+        firstName = stored[0] || '';
+        lastName  = '';
+      }
       setProfile({
-        firstName:      stored[0] || '',
-        lastName:       stored.slice(1).join(' ') || '',
+        firstName,
+        lastName,
         email:          localStorage.getItem('userEmail') || '',
         phone:          localStorage.getItem('userPhone') || '',
         dateOfBirth:    '',
@@ -340,9 +578,14 @@ export default function ProfilePage() {
   const discountStatus = serverData?.discountStatus ?? 'none';
   const discountPct    = serverData?.discountPct ?? 0;
   const twoFAEnabled   = serverData?.twoFactorEnabled ?? false;
+  const [showOtpModal, setShowOtpModal] = useState(false);
 
-  // Will this profile qualify for verification once saved?
-  const willVerify = meetsVerification(profile);
+  const hasPersonalFields = !!(
+    (profile.firstName || profile.lastName) &&
+    profile.phone && profile.phone.trim().length > 0 &&
+    profile.dateOfBirth && profile.dateOfBirth.trim().length > 0 &&
+    profile.address && profile.address.trim().length > 0
+  );
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -432,6 +675,18 @@ export default function ProfilePage() {
       {showPwModal      && <ChangePasswordModal onClose={() => setShowPwModal(false)} />}
       {show2FA          && <TwoFAModal         onClose={() => setShow2FA(false)} />}
       {showDeleteModal  && <DeleteAccountModal  onClose={() => setShowDeleteModal(false)} />}
+      {showOtpModal && (
+        <AccountVerificationModal
+          onClose={() => setShowOtpModal(false)}
+          onVerified={async () => {
+            const p = await usersService.getProfile();
+            setServerData(p);
+          }}
+          userEmail={profile.email}
+          userPhone={profile.phone}
+          hasPersonalFields={hasPersonalFields}
+        />
+      )}
 
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -496,20 +751,35 @@ export default function ProfilePage() {
                   <ShieldCheck className="size-4" /> Verified Account
                 </div>
               ) : (
-                <div className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-amber-50 text-amber-700 rounded-full text-xs font-bold border border-amber-200">
-                  <AlertTriangle className="size-4" /> Unverified
-                </div>
-              )}
+                <div className="flex flex-col items-center gap-2">
+                  <div className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-amber-50 text-amber-700 rounded-full text-xs font-bold border border-amber-200">
+                    <AlertTriangle className="size-4" /> Unverified
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!hasPersonalFields) {
+                        toast.error('Please complete all personal fields (Name, Phone, Birth Date, and Address) on your profile first!');
+                      } else {
+                        setShowOtpModal(true);
+                      }
+                    }}
+                    className={`mt-1 px-4 py-2.5 text-xs font-black rounded-xl border transition-all ${
+                      hasPersonalFields
+                        ? 'bg-green-600 border-green-600 text-white hover:bg-green-700 hover:shadow-md'
+                        : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    🔐 Verify Account via OTP
+                  </button>
 
-              {!isVerified && willVerify && (
-                <p className="text-[11px] text-green-600 font-bold mt-2">
-                  ✅ Save your profile to become Verified!
-                </p>
-              )}
-              {!isVerified && !willVerify && (
-                <p className="text-[11px] text-gray-400 font-medium mt-2">
-                  Add phone, birthdate & address to get verified
-                </p>
+                  {!hasPersonalFields && (
+                    <p className="text-[10px] text-gray-400 font-bold max-w-[200px] text-center mt-1 leading-normal">
+                      Complete all personal details (Name, Phone, Birth Date, Address) to unlock OTP verification.
+                    </p>
+                  )}
+                </div>
               )}
             </div>
 
@@ -551,12 +821,6 @@ export default function ProfilePage() {
                 >
                   <Shield className="size-4" />
                   {twoFAEnabled ? '2FA Enabled ✓' : 'Enable 2FA'}
-                </button>
-                <button
-                  onClick={() => router.push('/customer/payment-methods')}
-                  className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border border-gray-200 text-sm font-bold text-[#1e3d5a] hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors"
-                >
-                  <span className="text-base leading-none">💙</span> GCash &amp; Payment Methods
                 </button>
               </div>
             </div>
@@ -700,7 +964,6 @@ export default function ProfilePage() {
                 {[
                   { key: 'emailNotifications' as const, icon: Bell, label: 'Email Notifications', desc: 'Receive booking confirmations' },
                   { key: 'smsUpdates'          as const, icon: Smartphone, label: 'SMS Updates',          desc: 'Get real-time parking alerts' },
-                  { key: 'autoExtend'          as const, icon: RefreshCcw, label: 'Auto-extend Booking',  desc: 'Automatically extend if running late' },
                 ].map(({ key, icon: Icon, label, desc }) => (
                   <div key={key} onClick={() => handleTogglePref(key)}
                     className={`p-5 rounded-2xl border flex justify-between items-start transition-all cursor-pointer hover:-translate-y-0.5 ${

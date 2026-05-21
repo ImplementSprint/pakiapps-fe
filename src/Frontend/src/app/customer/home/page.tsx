@@ -30,9 +30,126 @@ const VehicleIcon = ({ type, size }: { type?: string; size: number }) => {
   }
 };
 
+const TutorialOverlay = () => {
+  const [step, setStep] = useState<number | null>(null);
+  const [modalStyle, setModalStyle] = useState<any>({});
+  const [mascotStyle, setMascotStyle] = useState<any>({});
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hasSeen = localStorage.getItem('hasSeenTutorial');
+      if (!hasSeen) setStep(0);
+    }
+  }, []);
+
+  useEffect(() => {
+    const removeHighlights = () => {
+      document.querySelectorAll('.tutorial-highlight').forEach(el => {
+        el.classList.remove('tutorial-highlight', '!relative', '!z-[1001]', 'ring-4', 'ring-orange-400', 'bg-white', 'shadow-2xl', 'rounded-xl', 'px-2', 'py-1');
+      });
+    };
+    
+    removeHighlights();
+    
+    if (step === 1) {
+      const el = document.getElementById('tutorial-add-vehicle');
+      if (el) {
+        el.classList.add('tutorial-highlight', '!relative', '!z-[1001]', 'ring-4', 'ring-orange-400', 'bg-white', 'shadow-2xl', 'rounded-xl', 'px-2', 'py-1');
+        const rect = el.getBoundingClientRect();
+        if (window.innerWidth > 768) {
+          setModalStyle({ position: 'absolute', top: rect.bottom + 60, right: window.innerWidth - rect.right - 20 });
+          // Position mascot above the button, centered horizontally
+          const mascotSize = 60;
+          const topPos = rect.top - mascotSize - 10; // 10px gap above button
+          const leftPos = rect.left + rect.width / 2 - mascotSize / 2;
+          setMascotStyle({
+            position: 'absolute',
+            top: `${topPos}px`,
+            left: `${leftPos}px`,
+            width: `${mascotSize}px`,
+            height: `${mascotSize}px`,
+            zIndex: 30,
+          });
+        } else {
+          setModalStyle({});
+          setMascotStyle({});
+        }
+      }
+    } else if (step === 2) {
+      const el = document.getElementById('tutorial-reserve-now');
+      if (el) {
+        el.classList.add('tutorial-highlight', '!relative', '!z-[1001]', 'ring-4', 'ring-orange-400', 'shadow-2xl');
+        const rect = el.getBoundingClientRect();
+        if (window.innerWidth > 768) setModalStyle({ position: 'absolute', top: rect.bottom + 60, right: window.innerWidth - rect.right });
+        else setModalStyle({});
+      }
+    } else {
+      setModalStyle({});
+    }
+
+    return removeHighlights;
+  }, [step]);
+
+  if (step === null) return null;
+
+  const handleNext = () => {
+    if (step >= 2) {
+      localStorage.setItem('hasSeenTutorial', 'true');
+      setStep(null);
+    } else {
+      setStep(s => s! + 1);
+    }
+  };
+
+  const handleSkip = () => {
+    localStorage.setItem('hasSeenTutorial', 'true');
+    setStep(null);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[1000] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in transition-all">
+      <div style={modalStyle} className="bg-white rounded-[2rem] w-full max-w-sm shadow-2xl relative pt-14 pb-6 px-6 text-center animate-in zoom-in-95 duration-300">
+        
+        <div className="bg-[#1e3d5a] text-white absolute top-0 left-0 right-0 h-20 rounded-t-[2rem] flex items-center justify-center pt-5 z-10">
+           <h3 className="font-black tracking-widest text-xs lg:text-sm uppercase drop-shadow-sm">
+             {step === 0 ? 'Welcome to PakiPark' : step === 1 ? 'Manage Your Vehicles' : 'Reserve Your Spot'}
+           </h3>
+        </div>
+
+        {/* Mascot positioned dynamically based on step */}
+        <div style={mascotStyle} className="pointer-events-none drop-shadow-xl animate-in slide-in-from-bottom-5 fade-in duration-500">
+           <Image src="/assets/12fd230c37e50c6b66ed6ffc16a84157be746936.png" alt="Mascot" fill className="object-contain" unoptimized />
+        </div>
+
+        <div className="mt-14 mb-8 text-gray-500 text-sm font-medium leading-relaxed px-2 relative z-10">
+          {step === 0 && 'This tutorial will guide you through the main features of PakiPark. Ready to start?'}
+          {step === 1 && "Click 'Add New' to register your vehicles. Select a vehicle from your list to make it the active one."}
+          {step === 2 && "Ready to park? Click the orange 'Reserve Now' button to search and select your preferred parking location, then proceed to book your spot."}
+        </div>
+
+        <div className="space-y-4 relative z-20">
+          <button onClick={handleNext} className="w-full bg-[#ee6b20] hover:bg-[#d95a10] text-white font-black py-4 rounded-xl transition-all shadow-lg shadow-orange-200">
+            {step === 0 || step === 1 ? 'NEXT STEP' : 'GET STARTED'}
+          </button>
+          
+          <div className="flex items-center justify-between px-2">
+            {step > 0 ? (
+               <button onClick={() => setStep(s => s! - 1)} className="text-xs font-bold text-gray-400 hover:text-gray-600 transition-colors uppercase tracking-wider">
+                 &lt; Back
+               </button>
+            ) : <div />}
+            <button onClick={handleSkip} className="text-xs font-bold text-gray-400 hover:text-gray-600 transition-colors uppercase tracking-wider">
+              Skip Tutorial
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function CustomerHomePage() {
   const router = useRouter();
-  const userName = typeof globalThis.window !== 'undefined' ? (localStorage.getItem('userName') ?? 'Guest User') : 'Guest User';
+  const [userName, setUserName] = useState('Guest User');
 
   const [showGuide, setShowGuide] = useState(false);
 
@@ -40,6 +157,9 @@ export default function CustomerHomePage() {
   const [recentBookings, setRecentBookings] = useState<Booking[]>([]);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setUserName(localStorage.getItem('userName') ?? 'Guest User');
+    }
     vehiclesService.getMyVehicles().then(v => setVehicles(v ?? [])).catch(() => {});
     bookingService.getMyBookings({ page: 1 }).then(data => setRecentBookings((data.bookings ?? []).slice(0, 5))).catch(() => {});
   }, []);
@@ -111,7 +231,7 @@ export default function CustomerHomePage() {
             <button onClick={() => setShowGuide(true)} className="flex items-center gap-2 bg-white border border-gray-200 text-[#1e3d5a] font-bold px-6 py-3.5 rounded-full hover:bg-gray-50 hover:shadow-md transition-all">
               <Info size={18} /> Guide
             </button>
-            <button onClick={() => router.push('/customer/find-parking')} className="flex items-center gap-2 bg-[#ee6b20] text-white font-bold px-6 py-3.5 rounded-full hover:bg-[#d95a10] hover:shadow-lg shadow-orange-200 transition-all">
+            <button id="tutorial-reserve-now" onClick={() => router.push('/customer/find-parking')} className="flex items-center gap-2 bg-[#ee6b20] text-white font-bold px-6 py-3.5 rounded-full hover:bg-[#d95a10] hover:shadow-lg shadow-orange-200 transition-all">
               <MapPin size={18} /> Reserve Now
             </button>
           </div>
@@ -123,7 +243,7 @@ export default function CustomerHomePage() {
             <h2 className="text-xl font-black text-[#1e3d5a] flex items-center gap-2">
               <Car size={22} className="text-[#1e3d5a]" /> My Vehicles
             </h2>
-            <button onClick={() => router.push('/customer/vehicles')} className="text-[#ee6b20] text-sm font-bold flex items-center gap-1 hover:underline">
+            <button id="tutorial-add-vehicle" onClick={() => router.push('/customer/vehicles')} className="text-[#ee6b20] text-sm font-bold flex items-center gap-1 hover:underline">
               <Plus size={16} /> Add New
             </button>
           </div>
@@ -257,17 +377,17 @@ export default function CustomerHomePage() {
               <p className="text-sm text-gray-500 font-medium mt-1">View active bookings</p>
             </button>
 
-            {/* Nav Card 3 — FAQ (SCRUM-999) */}
+            {/* Nav Card 3 — Ratings */}
             <button 
               type="button"
-              onClick={() => router.push('/help')}
+              onClick={() => router.push('/customer/ratings')}
               className="group mt-20 bg-white rounded-[2rem] pt-16 pb-8 px-6 shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-2 hover:border-yellow-100 transition-all duration-300 flex flex-col items-center text-center relative"
             >
               <div className="absolute -top-24 left-1/2 -translate-x-1/2 h-44 w-44 transition-transform duration-500 group-hover:-translate-y-4 group-hover:scale-110 animate-in zoom-in delay-150">
-                <Image src="/assets/49e0d16aae0cfb13df1b2acdc4fbd4b2ab68795e.png" alt="Help & FAQ mascot" fill className="object-contain drop-shadow-2xl" unoptimized />
+                <Image src="/assets/49e0d16aae0cfb13df1b2acdc4fbd4b2ab68795e.png" alt="Ratings mascot" fill className="object-contain drop-shadow-2xl" unoptimized />
               </div>
-              <h3 className="text-lg font-black text-[#1e3d5a]">Help &amp; FAQ</h3>
-              <p className="text-sm text-gray-500 font-medium mt-1">Get instant answers</p>
+              <h3 className="text-lg font-black text-[#1e3d5a]">Ratings &amp; Reviews</h3>
+              <p className="text-sm text-gray-500 font-medium mt-1">Share your experience</p>
             </button>
           </div>
         </section>
@@ -304,7 +424,7 @@ export default function CustomerHomePage() {
                     </div>
                   </div>
                   <div className="text-right flex flex-col items-end">
-                    <p className="font-black text-[#ee6b20] text-[15px]">₱{b.amount?.toFixed(2)}</p>
+                    <p className="font-black text-[#ee6b20] text-[15px]">₱{Number(b.amount || 0).toFixed(2)}</p>
                     <div className={`mt-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest ${
                       b.status === 'completed' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'
                     }`}>
@@ -364,6 +484,9 @@ export default function CustomerHomePage() {
           </div>
         </div>
       )}
+
+      {/* ── Tutorial Overlay ─────────────────────────────────────────────────── */}
+      <TutorialOverlay />
     </div>
   );
 }

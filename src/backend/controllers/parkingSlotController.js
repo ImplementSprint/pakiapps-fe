@@ -29,17 +29,15 @@ function buildSlots(locationId, sections, slotsPerSection, floors) {
   for (let floor = 1; floor <= floors; floor++) {
     for (const section of sections) {
       for (let i = 1; i <= slotsPerSection; i++) {
-        const shortLabel = `${section}${i}`;
-        const label = floors > 1 ? `F${floor}-${shortLabel}` : shortLabel;
+        const colNumber = String(i);
         const isHandicapped = i === 1 && section === sections[0];
         const isEV          = i === slotsPerSection && section === sections[sections.length - 1];
         const type = isHandicapped ? 'handicapped' : isEV ? 'ev_charging' : 'regular';
         slots.push({
           locationId: locationId,
-          label, section, floor, type,
-          size: sizeForType(type),
+          label: `${section}${colNumber}`,
+          section, floor: String(floor), type,
           status: 'available',
-          vehicleTypeAllowed: 'any',
         });
       }
     }
@@ -150,7 +148,22 @@ const getDashboardSlots = async (req, res) => {
 
     const timingMetas = [];
 
-    const result = slots.map((sj) => {
+    const result = slots.map((rawSj) => {
+      const match = String(rawSj.label || '').match(/^([A-Za-z]+)(\d+)$/);
+      const colNumber = match ? match[2] : '';
+      
+      const sj = {
+        ...rawSj,
+        id: rawSj.id,
+        _id: String(rawSj.id),
+        locationId: rawSj.location_id,
+        section: rawSj.section,
+        colNumber: colNumber,
+        label: rawSj.label,
+        size: 'standard',
+        vehicleTypeAllowed: 'any',
+      };
+
       const booking     = bookingMap[sj.id] || null;
       const timingMeta  = computeTimingMeta(booking);
       const derivedStatus = deriveDashboardStatus(sj.status, booking, timingMeta);
@@ -265,7 +278,6 @@ const generateSlots = async (req, res) => {
         ...s,
         locationId: locationId,
         status: s.status || 'available',
-        size: s.size || sizeForType(s.type)
       }));
     } else if (sections?.length && slotsPerSection && floors) {
       // Fallback to even grid generation

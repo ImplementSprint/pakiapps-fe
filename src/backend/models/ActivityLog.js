@@ -9,35 +9,62 @@ const { sequelize } = require('../config/db');
 const ActivityLog = sequelize.define(
   'ActivityLog',
   {
-    id:     { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    userId: { type: DataTypes.STRING,  allowNull: true },  // UUID as text (supabaseId)
-
-    action: { type: DataTypes.STRING(80), allowNull: false },
-
-    entityType:  { type: DataTypes.STRING(50), allowNull: true },
-    entityId:    { type: DataTypes.STRING(30), allowNull: true },
-    description: { type: DataTypes.TEXT,       allowNull: true },
-
-    ipAddress: { type: DataTypes.STRING(45), allowNull: true },
-    userAgent: { type: DataTypes.TEXT,       allowNull: true },
-
-    severity: {
-      type: DataTypes.ENUM('info', 'warning', 'critical'),
-      allowNull: false,
-      defaultValue: 'info',
+    id:       { type: DataTypes.UUID, primaryKey: true, defaultValue: DataTypes.UUIDV4 },
+    adminId:  { type: DataTypes.UUID, allowNull: true, field: 'admin_id' },
+    
+    // Using virtual setter/getter for backward compatibility with logService
+    userId: {
+      type: DataTypes.VIRTUAL,
+      get() { return this.getDataValue('adminId'); },
+      set(val) { this.setDataValue('adminId', val); }
     },
-    metadata: { type: DataTypes.JSONB, defaultValue: {} },
+
+    action:   { type: DataTypes.STRING(80), allowNull: false },
+
+    targetType: { type: DataTypes.STRING(50), allowNull: true, field: 'target_type' },
+    entityType: {
+      type: DataTypes.VIRTUAL,
+      get() { return this.getDataValue('targetType'); },
+      set(val) { this.setDataValue('targetType', val); }
+    },
+
+    targetId: { type: DataTypes.UUID, allowNull: true, field: 'target_id' },
+    entityId: {
+      type: DataTypes.VIRTUAL,
+      get() { return this.getDataValue('targetId'); },
+      set(val) { this.setDataValue('targetId', val); }
+    },
+
+    details: { type: DataTypes.JSONB, defaultValue: {} },
+    
+    // Virtual fields packed into details on save
+    description: { type: DataTypes.VIRTUAL },
+    ipAddress:   { type: DataTypes.VIRTUAL },
+    userAgent:   { type: DataTypes.VIRTUAL },
+    severity:    { type: DataTypes.VIRTUAL },
+    metadata:    { type: DataTypes.VIRTUAL },
   },
   {
+    hooks: {
+      beforeValidate: (log) => {
+        const details = log.details || {};
+        if (log.description) details.description = log.description;
+        if (log.ipAddress)   details.ipAddress = log.ipAddress;
+        if (log.userAgent)   details.userAgent = log.userAgent;
+        if (log.severity)    details.severity = log.severity;
+        if (log.metadata)    Object.assign(details, log.metadata);
+        log.details = details;
+      }
+    },
     tableName:  'activity_logs',
     schema:     'partner',         // ← partner schema (NO public)
     timestamps: true,
-    updatedAt: false,
+    createdAt:  'created_at',
+    updatedAt:  false,
     indexes: [
-      { name: 'idx_partner_actlog_user',     fields: ['userId'] },
+      { name: 'idx_partner_actlog_user',     fields: ['admin_id'] },
       { name: 'idx_partner_actlog_action',   fields: ['action'] },
-      { name: 'idx_partner_actlog_entity',   fields: ['entityType', 'entityId'] },
-      { name: 'idx_partner_actlog_severity', fields: ['severity'] },
+      { name: 'idx_partner_actlog_entity',   fields: ['target_type', 'target_id'] },
     ],
   }
 );

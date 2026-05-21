@@ -9,9 +9,9 @@ async function checkSchema() {
   });
 
   try {
-    const [bookings] = await sequelize.query("SELECT column_name FROM information_schema.columns WHERE table_schema = 'reservation' AND table_name = 'bookings' ORDER BY ordinal_position");
-    console.log('Columns in reservation.bookings:');
-    console.log(bookings.map(c => c.column_name));
+    const [bookings] = await sequelize.query("SELECT table_schema, column_name FROM information_schema.columns WHERE table_name = 'bookings' ORDER BY table_schema, ordinal_position");
+    console.log('Columns in bookings:');
+    console.log(bookings);
   } catch (err) {
     console.error(err);
   } finally {

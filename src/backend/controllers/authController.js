@@ -66,7 +66,7 @@ function isEmailIdentifier(value) {
 }
 
 /**
- * Look up a user in public.users by phone or email.
+ * Look up a user in account.profiles by phone or email.
  * Returns { id, supabaseId } or null.
  */
 async function findUserByIdentifier(identifier) {

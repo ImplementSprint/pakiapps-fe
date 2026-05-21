@@ -3,7 +3,7 @@
  * auth.js — JWT middleware (Supabase + account schema edition)
  * ============================================================
  * Supabase-issued JWTs are verified via supabase.auth.getUser().
- * Profile lookup hits account.users (NOT public.users).
+ * Profile lookup hits account.profiles.
  */
 
 const { getSupabaseClient } = require('../config/supabaseClient');
@@ -32,30 +32,45 @@ const protect = async (req, res, next) => {
 
     const authId = authUser.id;
 
-    // ── Lookup from account.users (NOT public.users) ─────────────────────
+    // ── Lookup from account.profiles ──────────────────────────────────────────
     const [rows] = await sequelize.query(
-      `SELECT * FROM account.users WHERE "supabaseId" = :authId LIMIT 1`,
+      `SELECT 
+         id,
+         id AS "supabaseId",
+         full_name AS name,
+         email,
+         phone,
+         dob AS "dateOfBirth",
+         role,
+         address,
+         profile_picture AS "profilePicture",
+         is_verified AS "isVerified",
+         documents,
+         notification_preferences AS preferences,
+         created_at AS "createdAt"
+       FROM account.profiles 
+       WHERE id = :authId 
+       LIMIT 1`,
       { replacements: { authId } },
     );
 
     let user = rows[0];
 
-    // Fallback: if not yet in account.users, create a minimal row on-the-fly
+    // Fallback: if not yet in account.profiles, create a minimal row on-the-fly
     if (!user) {
       const meta  = authUser.user_metadata || {};
       const role  = authUser.app_metadata?.role || 'customer';
       const email = authUser.email || null;
       try {
-        // No unique constraint on supabaseId — check first, then insert
         const [alreadyExists] = await sequelize.query(
-          `SELECT id FROM account.users WHERE "supabaseId" = :authId LIMIT 1`,
+          `SELECT id FROM account.profiles WHERE id = :authId LIMIT 1`,
           { replacements: { authId } }
         );
         if (alreadyExists.length === 0) {
           await sequelize.query(
-            `INSERT INTO account.users
-               (name, email, role, "isVerified", "supabaseId", password, "createdAt", "updatedAt")
-             VALUES (:name, :email, :role, true, :authId, '[SUPABASE_MANAGED]', now(), now())`,
+            `INSERT INTO account.profiles
+               (id, full_name, email, role, is_verified, created_at)
+             VALUES (:authId, :name, :email, :role, true, now())`,
             { replacements: {
               name: meta.name || email || '',
               email, role, authId
@@ -63,19 +78,33 @@ const protect = async (req, res, next) => {
           );
         }
         const [r2] = await sequelize.query(
-          `SELECT * FROM account.users WHERE "supabaseId" = :authId LIMIT 1`,
+          `SELECT 
+             id,
+             id AS "supabaseId",
+             full_name AS name,
+             email,
+             phone,
+             dob AS "dateOfBirth",
+             role,
+             address,
+             profile_picture AS "profilePicture",
+             is_verified AS "isVerified",
+             documents,
+             notification_preferences AS preferences,
+             created_at AS "createdAt"
+           FROM account.profiles 
+           WHERE id = :authId 
+           LIMIT 1`,
           { replacements: { authId } }
         );
         user = r2[0];
-      } catch (_) { /* non-fatal */ }
+      } catch (err) { 
+        console.error('[Auth Middleware] Fallback insert failed:', err.message);
+      }
     }
 
     if (!user) {
       return res.status(401).json({ success: false, message: 'User profile not found' });
-    }
-
-    if (user.deletedAt) {
-      return res.status(401).json({ success: false, message: 'This account has been deleted' });
     }
 
     req.user        = user;

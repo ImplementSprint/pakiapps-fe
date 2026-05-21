@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { 
   Star, X, Send, CheckCircle2, AlertCircle, 
   ShieldCheck, Zap, UserCheck, Clock, MapPin, 
-  MessageSquare, Info 
+  MessageSquare, Info, ChevronDown
 } from "lucide-react";
 
 interface RateAndReviewProps {
@@ -10,9 +10,11 @@ interface RateAndReviewProps {
   onClose: () => void;
   onSubmit: (data: any) => void;
   bookingId?: string;
+  availableBookings?: { id: string; reference: string; date: string; location: string }[];
 }
 
-export function RateAndReview({ isOpen, onClose, onSubmit, bookingId }: RateAndReviewProps) {
+export function RateAndReview({ isOpen, onClose, onSubmit, bookingId, availableBookings }: RateAndReviewProps) {
+  const [selectedBookingRef, setSelectedBookingRef] = useState(bookingId || "");
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [comment, setComment] = useState("");
@@ -58,7 +60,11 @@ export function RateAndReview({ isOpen, onClose, onSubmit, bookingId }: RateAndR
       showToast("Please select a star rating to continue.", "error");
       return;
     }
-    onSubmit({ bookingId, rating, comment, selectedTags });
+    if (!selectedBookingRef && availableBookings && availableBookings.length > 0) {
+      showToast("Please select a transaction to review.", "error");
+      return;
+    }
+    onSubmit({ bookingId: selectedBookingRef, rating, comment, selectedTags });
     setIsSubmitted(true);
     setTimeout(() => { onClose(); setIsSubmitted(false); }, 2500);
   };
@@ -82,7 +88,25 @@ export function RateAndReview({ isOpen, onClose, onSubmit, bookingId }: RateAndR
           </div>
           <div>
             <h1 className="text-xl font-black tracking-tight uppercase text-[#1E3D5A]">Rate & Review</h1>
-            <p className="text-xs font-bold text-slate-400">Ref: {bookingId || "PKS-2024-001"}</p>
+            {availableBookings && availableBookings.length > 0 ? (
+              <div className="relative mt-1.5 group inline-block">
+                <select 
+                  className="appearance-none text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-full pl-3 pr-8 py-1.5 outline-none focus:border-[#EE6B20] focus:ring-4 focus:ring-[#EE6B20]/10 w-[320px] sm:w-[400px] cursor-pointer transition-all hover:bg-slate-100 hover:border-slate-300 truncate"
+                  value={selectedBookingRef}
+                  onChange={(e) => setSelectedBookingRef(e.target.value)}
+                >
+                  <option value="" disabled>Select a transaction...</option>
+                  {availableBookings.map(b => (
+                    <option key={b.id} value={b.reference}>
+                      Ref: {b.reference} • {b.location} • {b.date}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none group-hover:text-slate-600 transition-colors" />
+              </div>
+            ) : (
+              <p className="text-xs font-bold text-slate-400">Ref: {selectedBookingRef || "PKS-2024-001"}</p>
+            )}
           </div>
         </div>
         <button onClick={onClose} className="p-3 hover:bg-slate-100 rounded-full transition-colors border border-transparent active:scale-90">

@@ -20,60 +20,67 @@ const ParkingSlot = sequelize.define(
       defaultValue: DataTypes.UUIDV4 
     },
 
-    // ── Location FK (UUID → parking_lot.locations.id) ────────────────────────
     locationId: { 
       type: DataTypes.UUID, 
       allowNull: false,
       field: 'location_id'
     },
 
-    // ── Teller assignment (one teller per slot) ───────────────────────────────
-    // UUID of the teller user in auth.users / account.profiles.
-    // Nullable: slot is unassigned if null.
-    tellerUserId: { 
-      type: DataTypes.UUID, 
-      allowNull: true, 
-      defaultValue: null 
+    label: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
     },
 
-    // ── Slot identity ─────────────────────────────────────────────────────────
-    label:   { type: DataTypes.STRING(20), allowNull: false },
-    section: { type: DataTypes.STRING(10), allowNull: false },
-    floor:   { type: DataTypes.INTEGER,    defaultValue: 1 },
+    section: { 
+      type: DataTypes.STRING(10), 
+      allowNull: true,
+    },
 
-    // ── Classification ────────────────────────────────────────────────────────
+    floor: { 
+      type: DataTypes.STRING,    
+      defaultValue: '1' 
+    },
+
     type: {
       type:         DataTypes.STRING(30),
       defaultValue: 'regular',
-      // 'regular' | 'handicapped' | 'ev_charging' | 'vip' | 'motorcycle'
     },
-    size: {
-      type:         DataTypes.STRING(20),
-      defaultValue: 'standard',
-      allowNull:    false,
-      // 'compact' | 'standard' | 'large'
-    },
+
     status: {
       type:         DataTypes.STRING(20),
       defaultValue: 'available',
-      // 'available' | 'occupied' | 'reserved' | 'maintenance'
     },
+
+    // Virtual fields for backward compatibility with frontend
+    tellerUserId: { 
+      type: DataTypes.VIRTUAL
+    },
+
+    colNumber: {
+      type: DataTypes.VIRTUAL,
+      get() {
+        const lbl = this.getDataValue('label') || '';
+        const match = String(lbl).match(/^([A-Za-z]+)(\d+)$/);
+        return match ? match[2] : '';
+      }
+    },
+
+    size: {
+      type: DataTypes.VIRTUAL,
+      get() { return 'standard'; },
+    },
+
     vehicleTypeAllowed: {
-      type:         DataTypes.STRING(20),
-      defaultValue: 'any',
-      // 'sedan' | 'suv' | 'van' | 'truck' | 'motorcycle' | 'any'
+      type: DataTypes.VIRTUAL,
+      get() { return 'any'; },
     },
   },
   {
     tableName:  'parking_slots',
-    schema:     'parking_lot',     // ← mapped to new schema
-    timestamps: true,
+    schema:     'parking_lot',
+    timestamps: false, // The schema command didn't show created_at/updated_at
     indexes: [
-      { name: 'uq_parking_lot_parking_slots_location_label', unique: true,  fields: ['location_id', 'label'] },
-      { name: 'idx_parking_lot_slots_location_layout',       fields: ['location_id', 'floor', 'section'] },
-      { name: 'idx_parking_lot_slots_location_status',       fields: ['location_id', 'status'] },
-      { name: 'idx_parking_lot_slots_location_type',         fields: ['location_id', 'type'] },
-      { name: 'idx_parking_lot_slots_teller',                fields: ['tellerUserId'] },
+      { name: 'idx_parking_lot_slots_location',       fields: ['location_id'] },
     ],
   }
 );

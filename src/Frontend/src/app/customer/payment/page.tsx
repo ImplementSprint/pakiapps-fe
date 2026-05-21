@@ -222,7 +222,7 @@ export default function PaymentPage() {
                           </div>
                         </div>
                         <div className="text-right flex flex-col items-end gap-1">
-                          <p className="text-lg font-black text-[#1e3d5a]">₱{transaction.amount?.toFixed(2)}</p>
+                          <p className="text-lg font-black text-[#1e3d5a]">₱{Number(transaction.amount || 0).toFixed(2)}</p>
                           <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
                             transaction.status === 'completed' ? 'bg-green-100 text-green-700' : 
                             transaction.status === 'upcoming' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'

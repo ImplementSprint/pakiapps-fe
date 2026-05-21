@@ -80,7 +80,7 @@ const getReviewStats = async (req, res) => {
          SUM(CASE WHEN rating = 3 THEN 1 ELSE 0 END)::int AS "threeStars",
          SUM(CASE WHEN rating = 2 THEN 1 ELSE 0 END)::int AS "twoStars",
          SUM(CASE WHEN rating = 1 THEN 1 ELSE 0 END)::int AS "oneStar"
-       FROM reviews`,
+       FROM partner.reviews`,
       { type: QueryTypes.SELECT }
     );
     res.json({ success: true, data: stats || { averageRating: 0, totalReviews: 0 } });

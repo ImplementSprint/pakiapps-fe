@@ -35,13 +35,13 @@ class ApiClient {
     try {
       const response = await fetch(url, { ...options, headers: { ...this.getHeaders(), ...options.headers } });
       const data = await response.json();
-      if (!response.ok) {
+      if (!response.ok || (data && data.success === false)) {
         // Global 401 handler: log out user ONLY if it wasn't the login endpoint itself failing
         if (response.status === 401 && typeof window !== 'undefined' && !endpoint.includes('/auth/login')) {
           ['authToken', 'userRole', 'userName', 'userEmail', 'userId', 'userPhone', 'userProfilePic'].forEach(k => localStorage.removeItem(k));
           window.location.href = '/login';
         }
-        throw new Error(data.message ?? `Request failed with status ${response.status}`);
+        throw new Error(data.message || `Request failed`);
       }
       return data;
     } catch (error: any) {

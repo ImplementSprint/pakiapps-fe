@@ -11,6 +11,16 @@ export const usersService = {
     return res.data;
   },
 
+  async requestVerificationOTP(channel: 'email' | 'sms') {
+    const res = await api.post('/users/verify-account/request', { channel });
+    return res;
+  },
+
+  async verifyAccountOTP(otp: string) {
+    const res = await api.post('/users/verify-account/verify', { otp });
+    return res;
+  },
+
   async changePassword(currentPassword: string, newPassword: string) {
     const res = await api.put('/users/password', { currentPassword, newPassword });
     return res;

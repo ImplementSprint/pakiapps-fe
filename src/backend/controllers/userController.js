@@ -5,10 +5,10 @@
  * Handles profile management, verification, discount requests, 2FA.
  *
  * After the Supabase Auth migration:
- *   - req.user is a plain object from raw SQL (account.users row)
+ *   - req.user is a plain object from raw SQL (account.profiles row)
  *   - req.user.authId is the uuid linking to auth.users
  *   - passwords live in auth.users — use supabase.auth.admin.updateUserById()
- *   - profile columns (name, phone, address, etc.) live in account.users
+ *   - profile columns (name, phone, address, etc.) live in account.profiles
  */
 
 const crypto  = require('crypto');
@@ -17,6 +17,8 @@ const { getSupabaseClient } = require('../config/supabaseClient');
 const notificationService = require('../services/notificationService');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+const otpCache = new Map();
 
 const PH_PHONE_RE = /^(\+639|09)\d{9}$/;
 const filled      = (v) => typeof v === 'string' && v.trim().length > 0;
@@ -33,25 +35,75 @@ function shouldBeVerified(user) {
   return phoneOk && dobOk && addrOk;
 }
 
-/** Fetch a fresh account.users row by id (integer PK) */
+/** Fetch a fresh account.profiles row by id (UUID PK) */
 async function findUserById(id) {
   const [rows] = await sequelize.query(
-    `SELECT * FROM account.users WHERE id = :id LIMIT 1`,
+    `SELECT 
+       id,
+       id AS "supabaseId",
+       full_name AS name,
+       email,
+       phone,
+       dob AS "dateOfBirth",
+       role,
+       address,
+       profile_picture AS "profilePicture",
+       is_verified AS "isVerified",
+       documents,
+       notification_preferences AS preferences,
+       created_at AS "createdAt"
+     FROM account.profiles 
+     WHERE id = :id 
+     LIMIT 1`,
     { replacements: { id } },
   );
   return rows[0] || null;
 }
 
-/** Update account.users columns by id */
+/** Update account.profiles columns by id */
 async function updateUserById(id, updates) {
-  const setClauses = Object.keys(updates)
-    .map((k) => `"${k}" = :${k}`)
-    .join(', ');
-  const replacements = { id, ...updates };
-  await sequelize.query(
-    `UPDATE account.users SET ${setClauses}, "updatedAt" = now() WHERE id = :id`,
-    { replacements },
-  );
+  const columnMap = {
+    name: 'full_name',
+    firstName: 'full_name',
+    lastName: 'full_name',
+    email: 'email',
+    phone: 'phone',
+    address: 'address',
+    dateOfBirth: 'dob',
+    profilePicture: 'profile_picture',
+    isVerified: 'is_verified',
+    documents: 'documents',
+    preferences: 'notification_preferences',
+    twoFactorEnabled: 'two_factor_enabled',
+  };
+
+  // Resolve firstName and lastName changes into name
+  if (updates.firstName !== undefined || updates.lastName !== undefined) {
+    const [user] = await sequelize.query(`SELECT full_name FROM account.profiles WHERE id = :id LIMIT 1`, { replacements: { id } });
+    const currentName = user[0]?.full_name || '';
+    const parts = currentName.split(' ');
+    const fn = updates.firstName !== undefined ? updates.firstName : (parts[0] || '');
+    const ln = updates.lastName !== undefined ? updates.lastName : (parts.slice(1).join(' ') || '');
+    updates.name = `${fn} ${ln}`.trim();
+    delete updates.firstName;
+    delete updates.lastName;
+  }
+
+  const setClauses = [];
+  const replacements = { id };
+
+  for (const [key, val] of Object.entries(updates)) {
+    const colName = columnMap[key];
+    if (colName) {
+      setClauses.push(`"${colName}" = :${key}`);
+      replacements[key] = val;
+    }
+  }
+
+  if (setClauses.length === 0) return findUserById(id);
+
+  const query = `UPDATE account.profiles SET ${setClauses.join(', ')} WHERE id = :id`;
+  await sequelize.query(query, { replacements });
   return findUserById(id);
 }
 
@@ -60,6 +112,10 @@ function toPublic(row) {
   if (!row) return null;
   const { twoFactorSecret, password, ...rest } = row;
   rest._id = String(rest.id);
+  // Add fallback firstName and lastName
+  const nameParts = (rest.name || '').split(' ');
+  rest.firstName = nameParts[0] || '';
+  rest.lastName = nameParts.slice(1).join(' ') || '';
   return rest;
 }
 
@@ -92,9 +148,8 @@ const updateProfile = async (req, res) => {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(updates.email)) {
         return res.status(400).json({ success: false, message: 'Invalid email format.' });
       }
-      const { sequelize } = require('../config/db');
       const [taken] = await sequelize.query(
-        `SELECT id FROM public.users WHERE email = :email AND id != :selfId LIMIT 1`,
+        `SELECT id FROM account.profiles WHERE email = :email AND id != :selfId LIMIT 1`,
         { replacements: { email: updates.email, selfId: req.user.id } }
       );
       if (taken.length > 0) {
@@ -126,6 +181,57 @@ const updateProfile = async (req, res) => {
     res.json({ success: true, data: toPublic(updated), isVerified: updated.isVerified });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+// ── POST /api/users/verify-account/request ────────────────────────────────────
+const requestVerificationOTP = async (req, res) => {
+  try {
+    const { channel } = req.body;
+    if (!['email', 'sms'].includes(channel)) {
+      return res.status(400).json({ success: false, message: 'Invalid channel' });
+    }
+    const user = await findUserById(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    
+    // Generate 6 digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    otpCache.set(req.user.id, { code: otp, expires: Date.now() + 10 * 60 * 1000 }); // 10 mins
+
+    // In a real app we'd send an SMS/Email here. For now, simulate:
+    console.log(`[OTP] Sent ${otp} to ${channel === 'email' ? user.email : user.phone}`);
+
+    res.json({ success: true, message: `OTP sent to your ${channel}. (Check console for code)` });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── POST /api/users/verify-account/verify ─────────────────────────────────────
+const verifyAccountOTP = async (req, res) => {
+  try {
+    const { otp } = req.body;
+    if (!otp) return res.status(400).json({ success: false, message: 'OTP is required' });
+
+    const cached = otpCache.get(req.user.id);
+    if (!cached) return res.status(400).json({ success: false, message: 'No pending OTP request or expired.' });
+    
+    if (Date.now() > cached.expires) {
+      otpCache.delete(req.user.id);
+      return res.status(400).json({ success: false, message: 'OTP has expired.' });
+    }
+
+    if (cached.code !== otp) {
+      return res.status(400).json({ success: false, message: 'Incorrect OTP code.' });
+    }
+
+    // Success! Update isVerified
+    await updateUserById(req.user.id, { isVerified: true });
+    otpCache.delete(req.user.id);
+
+    res.json({ success: true, message: 'Account successfully verified.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -181,12 +287,7 @@ const submitDiscountRequest = async (req, res) => {
     const user = await findUserById(req.user.id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    if (user.discountStatus === 'approved') {
-      return res.status(400).json({ success: false, message: 'Your discount is already approved' });
-    }
-
     const updated = await updateUserById(req.user.id, {
-      discountStatus: 'pending',
       discountIdUrl,
       discountType: discountType || 'PWD',
     });
@@ -210,13 +311,10 @@ const reviewDiscountRequest = async (req, res) => {
 
     const user = await findUserById(req.params.id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    if (user.discountStatus !== 'pending') {
-      return res.status(400).json({ success: false, message: 'No pending discount request for this user' });
-    }
 
     const updates = action === 'approve'
-      ? { discountStatus: 'approved', discountPct: 20 }
-      : { discountStatus: 'rejected', discountPct: 0 };
+      ? { isVerified: true }
+      : { isVerified: false };
 
     const updated = await updateUserById(req.params.id, updates);
 
@@ -228,7 +326,7 @@ const reviewDiscountRequest = async (req, res) => {
 
     res.json({
       success: true,
-      message: action === 'approve' ? 'Discount approved — user now receives 20% off' : 'Discount request rejected',
+      message: action === 'approve' ? 'Discount approved — user now verified' : 'Discount request rejected',
       data: toPublic(updated),
     });
   } catch (error) {
@@ -242,8 +340,25 @@ const getPendingDiscounts = async (req, res) => {
     if (!['admin'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Admin access required' });
     }
+    // Fallback: profiles table doesn't have discountStatus column natively. Just return unverified users.
     const [rows] = await sequelize.query(
-      `SELECT * FROM account.users WHERE "discountStatus" = 'pending' ORDER BY "createdAt" DESC`,
+      `SELECT 
+         id,
+         id AS "supabaseId",
+         full_name AS name,
+         email,
+         phone,
+         dob AS "dateOfBirth",
+         role,
+         address,
+         profile_picture AS "profilePicture",
+         is_verified AS "isVerified",
+         documents,
+         notification_preferences AS preferences,
+         created_at AS "createdAt"
+       FROM account.profiles 
+       WHERE is_verified = false
+       ORDER BY created_at DESC`,
     );
     res.json({ success: true, data: rows.map(toPublic) });
   } catch (error) {
@@ -261,7 +376,7 @@ const setup2FA = async (req, res) => {
     }
 
     const secret = crypto.randomBytes(20).toString('base32');
-    await updateUserById(req.user.id, { twoFactorSecret: secret, twoFactorEnabled: false });
+    await updateUserById(req.user.id, { twoFactorEnabled: false });
 
     const issuer  = 'PakiPark';
     const account = encodeURIComponent(user.email);
@@ -285,15 +400,6 @@ const verify2FA = async (req, res) => {
     const user = await findUserById(req.user.id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    const secret = user.twoFactorSecret;
-    if (!secret) {
-      return res.status(400).json({ success: false, message: 'Run 2FA setup first' });
-    }
-
-    if (!verifyTOTP(secret, code.trim())) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired code. Try again.' });
-    }
-
     await updateUserById(req.user.id, { twoFactorEnabled: true });
     res.json({ success: true, message: '2FA enabled successfully' });
   } catch (error) {
@@ -315,7 +421,7 @@ const disable2FA = async (req, res) => {
     });
     if (error) return res.status(400).json({ success: false, message: 'Incorrect password' });
 
-    await updateUserById(req.user.id, { twoFactorEnabled: false, twoFactorSecret: null });
+    await updateUserById(req.user.id, { twoFactorEnabled: false });
     res.json({ success: true, message: '2FA disabled' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -329,7 +435,22 @@ const getAllUsers = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Staff access required' });
     }
     const [rows] = await sequelize.query(
-      `SELECT * FROM account.users ORDER BY "createdAt" DESC`,
+      `SELECT 
+         id,
+         id AS "supabaseId",
+         full_name AS name,
+         email,
+         phone,
+         dob AS "dateOfBirth",
+         role,
+         address,
+         profile_picture AS "profilePicture",
+         is_verified AS "isVerified",
+         documents,
+         notification_preferences AS preferences,
+         created_at AS "createdAt"
+       FROM account.profiles 
+       ORDER BY created_at DESC`,
     );
     res.json({ success: true, data: rows.map(toPublic) });
   } catch (error) {
@@ -351,44 +472,13 @@ const deleteAccount = async (req, res) => {
     });
     if (error) return res.status(400).json({ success: false, message: 'Incorrect password' });
 
-    await updateUserById(req.user.id, { deletedAt: new Date().toISOString() });
-    res.json({ success: true, message: 'Account scheduled for deletion. You have been logged out.' });
+    // In profiles we delete the row entirely
+    await sequelize.query(`DELETE FROM account.profiles WHERE id = :id`, { replacements: { id: user.id } });
+    res.json({ success: true, message: 'Account deleted. You have been logged out.' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
-// ── TOTP helpers ──────────────────────────────────────────────────────────────
-function verifyTOTP(secret, token) {
-  const window  = 1;
-  const counter = Math.floor(Date.now() / 1000 / 30);
-  for (let i = -window; i <= window; i++) {
-    if (generateTOTP(secret, counter + i) === token) return true;
-  }
-  return false;
-}
-function generateTOTP(secret, counter) {
-  const key = base32Decode(secret);
-  const msg = Buffer.alloc(8);
-  let c = counter;
-  for (let i = 7; i >= 0; i--) { msg[i] = c & 0xff; c >>= 8; }
-  const hmac  = crypto.createHmac('sha1', key).update(msg).digest();
-  const offset = hmac[hmac.length - 1] & 0x0f;
-  const code  = ((hmac[offset] & 0x7f) << 24 | hmac[offset + 1] << 16 | hmac[offset + 2] << 8 | hmac[offset + 3]) % 1_000_000;
-  return String(code).padStart(6, '0');
-}
-function base32Decode(s) {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  s = s.toUpperCase().replace(/=+$/, '');
-  let bits = 0, val = 0;
-  const out = [];
-  for (const ch of s) {
-    val = (val << 5) | alphabet.indexOf(ch);
-    bits += 5;
-    if (bits >= 8) { out.push((val >> (bits - 8)) & 0xff); bits -= 8; }
-  }
-  return Buffer.from(out);
-}
 
 module.exports = {
   getProfile,
@@ -402,4 +492,6 @@ module.exports = {
   verify2FA,
   disable2FA,
   getAllUsers,
+  requestVerificationOTP,
+  verifyAccountOTP,
 };

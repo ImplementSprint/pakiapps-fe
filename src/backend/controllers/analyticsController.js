@@ -37,7 +37,7 @@ const getRevenueData = async (req, res) => {
          TO_CHAR(DATE_TRUNC('month', "createdAt"), 'YYYY-MM') AS "_id",
          SUM(amount)::float                                    AS revenue,
          COUNT(*)::int                                         AS bookings
-       FROM bookings
+       FROM reservation.bookings
        WHERE "paymentStatus" = 'paid'
          AND "createdAt" >= :sixMonthsAgo
        GROUP BY DATE_TRUNC('month', "createdAt")
@@ -60,7 +60,7 @@ const getOccupancyData = async (req, res) => {
       `SELECT
          "timeSlot" AS "_id",
          COUNT(*)::int AS count
-       FROM bookings
+       FROM reservation.bookings
        WHERE "date" = :today
          AND status IN ('upcoming', 'active')
        GROUP BY "timeSlot"
@@ -84,7 +84,7 @@ const getVehicleTypeDistribution = async (req, res) => {
       `SELECT
          "vehicleType" AS "_id",
          COUNT(*)::int AS count
-       FROM bookings
+       FROM reservation.bookings
        WHERE "vehicleType" IS NOT NULL
        GROUP BY "vehicleType"
        ORDER BY count DESC`,
@@ -104,7 +104,7 @@ const getPaymentMethodDistribution = async (req, res) => {
       `SELECT
          "paymentMethod" AS "_id",
          COUNT(*)::int   AS count
-       FROM bookings
+       FROM reservation.bookings
        GROUP BY "paymentMethod"
        ORDER BY count DESC`,
       { type: QueryTypes.SELECT }

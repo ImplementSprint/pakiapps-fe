@@ -6,7 +6,7 @@ const getMyVehicles = async (req, res) => {
   try {
     const vehicles = await Vehicle.findAll({
       where: { userId: req.user.id },
-      order: [['isDefault', 'DESC'], ['createdAt', 'DESC']],
+      order: [['isDefault', 'DESC'], ['created_at', 'DESC']],
     });
     res.json({ success: true, data: vehicles.map((v) => v.toJSON()) });
   } catch (error) {
@@ -61,7 +61,7 @@ const deleteVehicle = async (req, res) => {
     if (wasDefault) {
       const next = await Vehicle.findOne({
         where: { userId: req.user.id },
-        order: [['createdAt', 'ASC']],
+        order: [['created_at', 'ASC']],
       });
       if (next) await next.update({ isDefault: true });
     }

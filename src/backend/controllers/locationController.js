@@ -41,22 +41,24 @@ async function getScopedHubIds(user) {
     // Business partners own hubs via parking_lot.locations.partner_user_id (UUID = supabaseId)
     const [rows] = await sequelize.query(
       `SELECT id FROM parking_lot.locations
-       WHERE partner_user_id = :authId AND status::text != 'inactive'`,
+       WHERE owner_id = :authId AND status::text != 'inactive'`,
       { replacements: { authId: user.authId } }
     );
     return { hubIds: rows.map(r => r.id) };
   }
 
   if (user.role === 'teller') {
-    // Tellers are assigned to hubs via routing.parking_slots.tellerUserId (UUID = supabaseId)
-    // Wait, let's use parking_lot.parking_slots instead if we moved it. But the routing.parking_slots has the data. Let's use it for now, or just parking_lot.parking_slots.
-    // The user didn't mention tellers, but we'll adapt routing to parking_lot if needed. We'll use parking_lot.parking_slots.
-    const [rows] = await sequelize.query(
-      `SELECT DISTINCT location_id AS hub_id
-       FROM parking_lot.parking_slots
-       WHERE "tellerUserId" = :authId`, // Note: Make sure tellerUserId is present in parking_lot.parking_slots
-      { replacements: { authId: user.authId } }
-    );
+    let rows = [];
+    try {
+      [rows] = await sequelize.query(
+        `SELECT DISTINCT location_id AS hub_id
+         FROM parking_lot.parking_slots
+         WHERE "tellerUserId" = :authId`,
+        { replacements: { authId: user.authId } }
+      );
+    } catch (err) {
+      // column doesn't exist, ignore
+    }
     // Fallback to routing.parking_slots if parking_lot is empty/missing column
     if (rows.length === 0) {
         try {

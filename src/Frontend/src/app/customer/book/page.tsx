@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import Barcode from 'react-barcode';
+import { toPng } from 'html-to-image';
 
 import { bookingService } from '@/services/bookingService';
 import { parkingSlotService, ParkingSlot } from '@/services/parkingSlotService';
@@ -67,7 +68,7 @@ function BookParkingContent() {
     }).catch(() => {});
   }, [queryVehicleId]);
 
-  const [currentStep, setCurrentStep] = useState<'timeslot' | 'review' | 'payment' | 'receipt'>('timeslot');
+  const [currentStep, setCurrentStep] = useState<'timeslot' | 'review' | 'payment' | 'receipt' | 'payment-failed'>('timeslot');
   const [isConfirming, setIsConfirming] = useState(false);
 
   const [showFloorModal, setShowFloorModal] = useState(false);
@@ -99,6 +100,15 @@ function BookParkingContent() {
     });
   }, []);
 
+  const [customerName, setCustomerName] = useState('Guest User');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('userName');
+      if (stored) setCustomerName(stored);
+    }
+  }, []);
+
   const [isReceiptLoading, setIsReceiptLoading] = useState(false);
   const [loadedBooking, setLoadedBooking] = useState<any>(null);
 
@@ -115,7 +125,7 @@ function BookParkingContent() {
             setBookingData({
               date: b.date,
               selectedSlot: b.timeSlot,
-              selectedParkingSlot: { label: b.spot, floor: b.parkingSlotId ? 1 : 1 } as any,
+              selectedParkingSlot: { label: b.spot, floor: b.floor || 1 } as any,
               paymentMethod: b.paymentMethod,
               savedPaymentMethodId: null
             });
@@ -125,6 +135,11 @@ function BookParkingContent() {
               model: b.vehicleModel || 'Vehicle',
               type: b.vehicleType || 'Sedan'
             });
+            if (b.userId?.name) {
+              setCustomerName(b.userId.name);
+            } else if (b.userName) {
+              setCustomerName(b.userName);
+            }
             setLoadedBooking(b);
             setCurrentStep('receipt');
           } else {
@@ -137,8 +152,57 @@ function BookParkingContent() {
         .finally(() => {
           setIsReceiptLoading(false);
         });
+    } else if (step === 'payment-failed' && ref) {
+      setIsReceiptLoading(true);
+      bookingService.getMyBookings({ search: ref })
+        .then(res => {
+          if (res.bookings && res.bookings.length > 0) {
+            const b = res.bookings[0];
+            const bookingId = b._id || b.id;
+            // Un-reserve the slot since payment failed or was aborted!
+            if (b.status === 'upcoming' && bookingId) {
+              bookingService.cancelBooking(String(bookingId), 'Payment declined or aborted').catch(() => {});
+            }
+            setCurrentStep('payment-failed');
+          }
+        })
+        .finally(() => setIsReceiptLoading(false));
     }
   }, [searchParams]);
+
+  const handleDownloadImage = () => {
+    const node = document.getElementById('epass-card');
+    if (!node) return toast.error('Ticket card not found on the page.');
+
+    const loadingToast = toast.loading('Generating high-resolution ticket image...');
+
+    // Wait a brief tick for barcodes/images to render completely
+    setTimeout(() => {
+      toPng(node, {
+        backgroundColor: '#ffffff',
+        style: {
+          transform: 'scale(1)',
+          transformOrigin: 'top left',
+          width: node.offsetWidth + 'px',
+          height: node.offsetHeight + 'px',
+        },
+        pixelRatio: 2, // 2x resolution for ultra-sharp rendering
+      })
+      .then((dataUrl) => {
+        const link = document.createElement('a');
+        link.download = `PakiPark-EPass-${ticketRef}.png`;
+        link.href = dataUrl;
+        link.click();
+        toast.dismiss(loadingToast);
+        toast.success('Ticket image downloaded successfully!');
+      })
+      .catch((error) => {
+        console.error('Oops, something went wrong with image generation!', error);
+        toast.dismiss(loadingToast);
+        toast.error('Failed to generate ticket image. Please try again.');
+      });
+    }, 150);
+  };
 
   const [cardDetails, setCardDetails] = useState({ number: '', name: '', expiry: '', cvv: '' });
   const [focusedField, setFocusedField] = useState<'number' | 'name' | 'expiry' | 'cvv' | null>(null);
@@ -658,11 +722,7 @@ function BookParkingContent() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-white/70">Base Rate</span>
-                      <span className="font-bold">₱{HOURLY_RATE.toFixed(2)}/hr</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-white/70">Duration</span>
-                      <span className="font-bold">1 hr</span>
+                      <span className="font-bold">₱{HOURLY_RATE.toFixed(2)}</span>
                     </div>
                     <hr className="border-white/10 my-4" />
                     <div className="flex justify-between items-end pt-2">
@@ -971,8 +1031,81 @@ function BookParkingContent() {
                   border-radius: 24px !important;
                   overflow: hidden !important;
                   box-shadow: none !important;
-                  border: 1px solid #e2e8f0 !important;
+                  border: 1px solid #cbd5e0 !important;
                   page-break-inside: avoid !important;
+                  background: #ffffff !important;
+                  color: #1e3d5a !important;
+                }
+                
+                /* Override Header for Print */
+                #epass-card .bg-\[\#1e3d5a\] {
+                  background: #ffffff !important;
+                  background-color: #ffffff !important;
+                  color: #1e3d5a !important;
+                  padding-top: 24px !important;
+                  padding-bottom: 20px !important;
+                }
+                #epass-card .text-\[\#90b4d8\] {
+                  color: #4a5568 !important;
+                  font-weight: 800 !important;
+                }
+                #epass-card h3.text-\[\#ee6b20\] {
+                  color: #ee6b20 !important;
+                  font-weight: 900 !important;
+                }
+                #epass-card .text-white\/70 {
+                  color: #718096 !important;
+                  font-weight: 600 !important;
+                }
+                #epass-card .text-white\/70 svg {
+                  display: none !important; /* Hide MapPin icon for clean layout */
+                }
+                #epass-card .opacity-80 {
+                  opacity: 1 !important;
+                }
+                #epass-card .bg-white\/5 {
+                  display: none !important;
+                }
+                
+                /* Detail row titles */
+                #epass-card .text-gray-400 {
+                  color: #718096 !important;
+                  font-weight: 800 !important;
+                }
+                
+                /* Detail values */
+                #epass-card .text-\[\#1e3d5a\] {
+                  color: #1e3d5a !important;
+                }
+                #epass-card .text-\[\#ee6b20\] {
+                  color: #ee6b20 !important;
+                }
+                
+                /* Barcode area */
+                #epass-card .bg-gray-50 {
+                  background: #ffffff !important;
+                  background-color: #ffffff !important;
+                  border: 1px solid #cbd5e0 !important;
+                }
+                #epass-card .text-gray-500 {
+                  color: #4a5568 !important;
+                }
+                
+                /* perforated divider border */
+                #epass-card .border-gray-200 {
+                  border-color: #cbd5e0 !important;
+                }
+                
+                /* Footer */
+                #epass-card .bg-orange-50 {
+                  background: #ffffff !important;
+                  background-color: #ffffff !important;
+                  border: 1px solid #fbd38d !important;
+                }
+                #epass-card .bg-white {
+                  background: #ffffff !important;
+                  background-color: #ffffff !important;
+                  border: 1px solid #cbd5e0 !important;
                 }
               }
             `}</style>
@@ -1008,7 +1141,7 @@ function BookParkingContent() {
                     <div>
                       <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Driver Name</p>
                       <p className="text-base font-black text-[#1e3d5a]">
-                        {activeVehicle.plate ? 'Guest User' : 'Unknown'}
+                        {customerName}
                       </p>
                     </div>
                     <div className="text-right">
@@ -1070,10 +1203,10 @@ function BookParkingContent() {
             {/* ── Action buttons (hidden when printing) ── */}
             <div className="space-y-3 mt-6 px-1">
               <Button
-                onClick={() => globalThis.print()}
+                onClick={handleDownloadImage}
                 className="w-full bg-[#1e3d5a] hover:bg-[#2a5373] h-14 rounded-2xl font-bold gap-2 text-white shadow-xl transition-all"
               >
-                <Download className="size-4" /> Download / Print E-Pass
+                <Download className="size-4" /> Download E-Pass
               </Button>
               <Button
                 onClick={() => router.push('/customer/home')}
@@ -1083,6 +1216,31 @@ function BookParkingContent() {
                 Return to Dashboard
               </Button>
             </div>
+          </div>
+        )}
+
+        {currentStep === 'payment-failed' && (
+          <div className="flex flex-col items-center justify-center pt-10 px-4">
+            <div className="size-20 bg-red-50 rounded-full flex items-center justify-center mb-6 shadow-sm">
+              <AlertCircle className="size-10 text-red-500" />
+            </div>
+            <h2 className="text-2xl font-black text-[#1e3d5a] mb-2 text-center">Payment Failed</h2>
+            <p className="text-gray-500 text-center mb-10 max-w-sm leading-relaxed text-sm font-medium">
+              We couldn't process your payment, or the transaction was cancelled. Your slot reservation has been safely released.
+            </p>
+            <Button
+              onClick={() => router.push('/customer/home')}
+              className="w-full bg-[#1e3d5a] hover:bg-[#2a5373] h-14 rounded-2xl font-bold text-white shadow-xl transition-all max-w-sm"
+            >
+              Return to Dashboard
+            </Button>
+            <Button
+              onClick={() => router.push('/customer/find-parking')}
+              variant="outline"
+              className="w-full mt-3 h-14 rounded-2xl font-bold border-gray-200 text-gray-600 bg-white shadow-sm hover:border-[#1e3d5a] transition-colors max-w-sm"
+            >
+              Try Booking Again
+            </Button>
           </div>
         )}
       </main>
