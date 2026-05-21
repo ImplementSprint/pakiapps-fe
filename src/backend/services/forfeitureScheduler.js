@@ -7,7 +7,7 @@
 
 const { Op }      = require('sequelize');
 const { sequelize } = require('../config/db');
-const { Booking, Location } = require('../models/index');
+const { Booking, Location, ParkingSlot } = require('../models/index');
 const { logBookingNoShow }  = require('./logService');
 const { formatBooking }     = require('../utils/formatters');
 const notificationService   = require('./notificationService');
@@ -62,7 +62,18 @@ async function runForfeitureSweep() {
       { where: { id: { [Op.in]: ids } } }
     );
 
-    // ── 2. Restore availableSpots for each affected location ──────────────────
+    // ── 2. Release physical parking slots back to 'available' ────────────────
+    const slotIdsToRelease = toForfeit
+      .filter((b) => b.parkingSlotId)
+      .map((b) => b.parkingSlotId);
+    if (slotIdsToRelease.length > 0) {
+      await ParkingSlot.update(
+        { status: 'available' },
+        { where: { id: { [Op.in]: slotIdsToRelease } } }
+      );
+    }
+
+    // ── 3. Restore availableSpots for each affected location ──────────────────
     const perLocation = {};
     toForfeit.forEach((b) => {
       if (b.locationId) perLocation[b.locationId] = (perLocation[b.locationId] || 0) + 1;

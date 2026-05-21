@@ -39,8 +39,8 @@ function parseSlotWindow(date: string, timeSlot: string): { start: Date; end: Da
   const m = timeSlot.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
   if (!m) return null;
   const [, sh, sm, eh, em] = m;
-  const start = new Date(`${date}T${sh.padStart(2, '0')}:${sm}:00`);
-  const end   = new Date(`${date}T${eh.padStart(2, '0')}:${em}:00`);
+  const start = new Date(`${date}T${sh.padStart(2, '0')}:${sm}:00+08:00`);
+  const end   = new Date(`${date}T${eh.padStart(2, '0')}:${em}:00+08:00`);
   return { start, end };
 }
 
@@ -384,8 +384,8 @@ function BookingRow({ booking, onCheckIn, onCheckOut, actionId, now }: {
             }`}>
             {isBusy ? <RefreshCw className="size-3.5 animate-spin" /> :
              canCheckIn ? <><CheckCircle2 className="size-3.5" />Check In</> :
-             ciState.state === 'early' ? <><Clock className="size-3.5" />{ciState.label}</> :
-             <><XCircle className="size-3.5" />{ciState.label}</>}
+             ciState.state === 'early' ? <><Clock className="size-3.5" />Check In</> :
+             <><XCircle className="size-3.5" />Check In</>}
           </button>
         )}
         {canCheckOut && (

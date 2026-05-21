@@ -8,7 +8,7 @@
  */
 
 const bookingService = require('../services/bookingService');
-const { Booking, Location } = require('../models/index');
+const { Booking, Location, ParkingSlot } = require('../models/index');
 const { formatBooking }     = require('../utils/formatters');
 const { logBookingCheckOut } = require('../services/logService');
 const { getScopedHubIds } = require('../controllers/locationController');
@@ -148,7 +148,10 @@ const checkOutBooking = async (req, res) => {
 
     await booking.update({ status: 'completed', checkOutAt, finalAmount });
 
-    // Release the parking spot back to availability
+    // Release the parking slot back to 'available'
+    if (booking.parkingSlotId) {
+      await ParkingSlot.update({ status: 'available' }, { where: { id: booking.parkingSlotId } });
+    }
     if (booking.locationId) {
       await Location.increment('availableSpots', { by: 1, where: { id: booking.locationId } });
     }
@@ -215,10 +218,10 @@ const checkInBooking = async (req, res) => {
     }
 
     // Parse slot start time from "HH:MM - HH:MM" format, e.g. "10:00 - 11:00"
-    const [startStr] = (booking.timeSlot || '').split(' - ');
+    const [startStr, endStr] = (booking.timeSlot || '').split(' - ');
     const bookingDate = booking.date; // YYYY-MM-DD
-    const slotStart  = startStr ? new Date(`${bookingDate}T${startStr}:00`) : null;
-    const slotEnd    = slotStart ? new Date(slotStart.getTime() + 60 * 60 * 1000) : null;
+    const slotStart  = startStr ? new Date(`${bookingDate}T${startStr}:00+08:00`) : null;
+    const slotEnd    = endStr ? new Date(`${bookingDate}T${endStr}:00+08:00`) : null;
     const now        = new Date();
     const GRACE_MS   = 15 * 60 * 1000; // 15 minutes
 
@@ -244,6 +247,11 @@ const checkInBooking = async (req, res) => {
       checkInAt:         now,
       checkedInByTeller: true,
     });
+
+    // Mark the physical slot as 'occupied'
+    if (booking.parkingSlotId) {
+      await ParkingSlot.update({ status: 'occupied' }, { where: { id: booking.parkingSlotId } });
+    }
 
     const formatted = formatBooking(booking.toJSON());
 

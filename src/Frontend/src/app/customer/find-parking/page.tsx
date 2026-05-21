@@ -1,6 +1,6 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import {
   ArrowLeft, MapPin, Search, DollarSign,
@@ -49,8 +49,10 @@ function getFilterLabel(f: string) {
   return 'All Locations';
 }
 
-export default function FindParkingPage() {
+function FindParkingContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const queryVehicleId = searchParams.get('vehicleId');
   const [searchQuery, setSearchQuery]   = useState('');
   const [filter, setFilter]             = useState<'all' | 'available' | 'ev'>('all');
   const [locations, setLocations]       = useState<any[]>([]);
@@ -72,9 +74,16 @@ export default function FindParkingPage() {
   };
 
   useEffect(() => {
-    vehiclesService.getMyVehicles().then(v => { if (v?.length) setActiveCar(v[0]); }).catch(() => {});
+    vehiclesService.getMyVehicles().then(v => {
+      if (!v?.length) return;
+      // Prefer the vehicle passed from the home page via ?vehicleId=
+      const preferred = queryVehicleId
+        ? v.find((x: any) => (x._id || x.id) === queryVehicleId)
+        : null;
+      setActiveCar(preferred || v.find((x: any) => x.isDefault) || v[0]);
+    }).catch(() => {});
     load();
-  }, []);
+  }, [queryVehicleId]);
 
   useEffect(() => {
     const t = setTimeout(async () => {
@@ -92,13 +101,15 @@ export default function FindParkingPage() {
   });
 
   const handleBookNow = (loc: any) => {
-    // encode details into query params or store locally - for brevity query params are easy
     const params = new URLSearchParams({
-      locationId: loc._id || loc.id,
+      locationId:   loc._id || loc.id,
       locationName: loc.name,
-      hourlyRate: String(loc.hourlyRate)
+      hourlyRate:   String(loc.hourlyRate)
     });
-    if (activeCar) params.set('vehicleId', activeCar._id || activeCar.id);
+    // queryVehicleId is what the user picked on the home page (URL source of truth)
+    // fall back to activeCar only if no query param was passed
+    const vid = queryVehicleId || activeCar?._id || activeCar?.id;
+    if (vid) params.set('vehicleId', vid);
     router.push(`/customer/book?${params.toString()}`);
   };
 
@@ -241,5 +252,13 @@ export default function FindParkingPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function FindParkingPage() {
+  return (
+    <Suspense>
+      <FindParkingContent />
+    </Suspense>
   );
 }

@@ -56,15 +56,19 @@ function BookParkingContent() {
     return () => clearInterval(timer);
   }, []);
 
+  const [allVehicles, setAllVehicles] = useState<any[]>([]);
+
   useEffect(() => {
     vehiclesService.getMyVehicles().then(v => {
-      const target = v.find((x: any) => x._id === queryVehicleId || x.id === queryVehicleId) || v[0];
-      if (target) setActiveVehicle({
-        _id: target._id || target.id,
-        plate: target.plateNumber,
-        model: `${target.brand} ${target.model}`.trim(),
-        type: target.type
-      });
+      const formatted = v.map((x: any) => ({
+        _id:   x._id || x.id,
+        plate: x.plateNumber,
+        model: `${x.brand} ${x.model}`.trim(),
+        type:  x.type,
+      }));
+      setAllVehicles(formatted);
+      const target = formatted.find((x: any) => x._id === queryVehicleId) || formatted[0];
+      if (target) setActiveVehicle(target);
     }).catch(() => {});
   }, [queryVehicleId]);
 
@@ -416,6 +420,22 @@ function BookParkingContent() {
             </h2>
 
             <form onSubmit={e => { e.preventDefault(); handleOpenFloorModal(); }} className="space-y-8">
+
+              {/* Vehicle Being Booked (read-only display) */}
+              {activeVehicle._id && (
+                <div className="flex items-center gap-4 bg-[#1e3d5a]/5 border border-[#1e3d5a]/10 rounded-2xl px-5 py-4">
+                  <div className="size-11 bg-[#1e3d5a] text-white rounded-xl flex items-center justify-center shrink-0">
+                    <Car className="size-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Booking For</p>
+                    <p className="text-[15px] font-black text-[#1e3d5a] truncate">{activeVehicle.model}</p>
+                    <p className="text-xs text-gray-400 font-mono mt-0.5 tracking-wider">{activeVehicle.plate} · <span className="capitalize">{activeVehicle.type}</span></p>
+                  </div>
+                  <div className="size-2 rounded-full bg-[#ee6b20] shrink-0" />
+                </div>
+              )}
+
               {/* Date Selection */}
               <div className="space-y-3">
                 <label htmlFor="targetDate" className="text-[11px] font-black text-gray-400 uppercase tracking-widest pl-1">Target Date</label>

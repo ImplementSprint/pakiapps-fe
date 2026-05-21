@@ -164,8 +164,19 @@ export default function CustomerHomePage() {
     bookingService.getMyBookings({ page: 1 }).then(data => setRecentBookings((data.bookings ?? []).slice(0, 5))).catch(() => {});
   }, []);
 
-  // Default vehicle: prefer the one marked isDefault, else first
-  const activeVehicle = vehicles.find(v => v.isDefault) || vehicles[0] || null;
+  // Active vehicle: prefer the default, else first. User can click any sidebar card to switch.
+  const [activeVehicle, setActiveVehicle] = useState<Vehicle | null>(null);
+
+  // When vehicles load, set the active vehicle to the default (or first)
+  useEffect(() => {
+    if (vehicles.length > 0 && !activeVehicle) {
+      setActiveVehicle(vehicles.find(v => v.isDefault) || vehicles[0]);
+    }
+  }, [vehicles]);
+
+  const handleSelectVehicle = (v: Vehicle) => {
+    setActiveVehicle(v);
+  };
 
   return (
     <div className="min-h-screen bg-[#f4f7fa]">
@@ -231,7 +242,11 @@ export default function CustomerHomePage() {
             <button onClick={() => setShowGuide(true)} className="flex items-center gap-2 bg-white border border-gray-200 text-[#1e3d5a] font-bold px-6 py-3.5 rounded-full hover:bg-gray-50 hover:shadow-md transition-all">
               <Info size={18} /> Guide
             </button>
-            <button id="tutorial-reserve-now" onClick={() => router.push('/customer/find-parking')} className="flex items-center gap-2 bg-[#ee6b20] text-white font-bold px-6 py-3.5 rounded-full hover:bg-[#d95a10] hover:shadow-lg shadow-orange-200 transition-all">
+            <button
+              id="tutorial-reserve-now"
+              onClick={() => router.push(`/customer/find-parking${activeVehicle ? `?vehicleId=${activeVehicle._id}` : ''}`)}
+              className="flex items-center gap-2 bg-[#ee6b20] text-white font-bold px-6 py-3.5 rounded-full hover:bg-[#d95a10] hover:shadow-lg shadow-orange-200 transition-all"
+            >
               <MapPin size={18} /> Reserve Now
             </button>
           </div>
@@ -303,40 +318,57 @@ export default function CustomerHomePage() {
                 </div>
               </button>
 
-              {/* Sidebar List (Other vehicles placeholder snippet) */}
+              {/* Sidebar List — click any car to make it the active selection */}
               <div className="lg:col-span-4 flex flex-col gap-3">
-                {vehicles.map((v) => (
-                  <div key={v._id} role="button" tabIndex={0} onClick={() => router.push('/customer/vehicles')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') router.push('/customer/vehicles'); }}
-                    className={`p-4 rounded-2xl border flex items-center gap-4 cursor-pointer transition-all ${
-                      v.isDefault
-                      ? 'bg-white border-[#1e3d5a] shadow-sm ring-1 ring-[#1e3d5a]/10'
-                      : 'bg-white/50 border-gray-200 hover:bg-white hover:border-gray-300'
-                    }`}
-                  >
-                    <div className={`size-12 rounded-xl flex items-center justify-center shrink-0 ${
-                      v.isDefault ? 'bg-[#1e3d5a] text-white' : 'bg-gray-100 text-gray-400'
-                    }`}>
-                      <VehicleIcon type={v.type} size={20} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className={`text-sm font-black uppercase truncate ${v.isDefault ? 'text-[#1e3d5a]' : 'text-gray-600'}`}>
-                        {v.brand} {v.model}
-                      </h4>
-                      <p className={`text-xs font-mono mt-0.5 ${v.isDefault ? 'text-[#ee6b20]' : 'text-gray-400'}`}>
-                        {v.plateNumber}{v.isDefault ? ' · Default' : ''}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                {vehicles.map((v) => {
+                  const isSelected = activeVehicle?._id === v._id;
+                  return (
+                    <button
+                      key={v._id}
+                      type="button"
+                      onClick={() => handleSelectVehicle(v)}
+                      className={`p-4 rounded-2xl border flex items-center gap-4 cursor-pointer transition-all duration-200 w-full text-left ${
+                        isSelected
+                          ? 'bg-white border-[#ee6b20] shadow-md ring-1 ring-[#ee6b20]/20 scale-[1.02]'
+                          : 'bg-white/50 border-gray-200 hover:bg-white hover:border-[#1e3d5a]/30 hover:shadow-sm hover:-translate-y-0.5'
+                      }`}
+                    >
+                      <div className={`size-12 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                        isSelected ? 'bg-[#ee6b20] text-white' : 'bg-gray-100 text-gray-400'
+                      }`}>
+                        <VehicleIcon type={v.type} size={20} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className={`text-sm font-black uppercase truncate transition-colors ${
+                          isSelected ? 'text-[#ee6b20]' : 'text-gray-600'
+                        }`}>
+                          {v.brand} {v.model}
+                        </h4>
+                        <p className={`text-xs font-mono mt-0.5 transition-colors ${
+                          isSelected ? 'text-[#1e3d5a] font-bold' : 'text-gray-400'
+                        }`}>
+                          {v.plateNumber}{v.isDefault ? ' · Default' : ''}
+                        </p>
+                      </div>
+                      {isSelected && (
+                        <CheckCircle2 size={18} className="text-[#ee6b20] shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
                 {vehicles.length === 1 && (
-                  <div role="button" tabIndex={0} onClick={() => router.push('/customer/vehicles')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') router.push('/customer/vehicles'); }} className="p-4 rounded-2xl border border-dashed border-gray-200 flex items-center gap-4 cursor-pointer hover:bg-white transition-colors opacity-50">
+                  <button
+                    type="button"
+                    onClick={() => router.push('/customer/vehicles')}
+                    className="p-4 rounded-2xl border border-dashed border-gray-200 flex items-center gap-4 cursor-pointer hover:bg-white transition-colors opacity-50 w-full text-left"
+                  >
                     <div className="size-12 rounded-xl bg-gray-50 flex items-center justify-center shrink-0 text-gray-300">
                       <Car size={20} />
                     </div>
                     <div className="flex-1">
-                      <h4 className="text-sm font-bold text-gray-400">Empty Slot</h4>
+                      <h4 className="text-sm font-bold text-gray-400">+ Add Another Car</h4>
                     </div>
-                  </div>
+                  </button>
                 )}
               </div>
             </div>

@@ -90,9 +90,14 @@ const getAvailableSlots = async (req, res) => {
       })
       .map((b) => b.parkingSlotId);
 
+    // Only return slots that:
+    // 1. Belong to the correct locationId
+    // 2. Are not in maintenance
+    // 3. Are not physically reserved/occupied in DB
+    // 4. Are not conflicting with existing bookings
     const where = {
       locationId,
-      status: { [Op.notIn]: ['maintenance'] },
+      status: { [Op.notIn]: ['maintenance', 'reserved', 'occupied'] },
     };
     if (conflictingIds.length > 0) where.id = { [Op.notIn]: conflictingIds };
 

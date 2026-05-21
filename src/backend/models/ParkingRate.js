@@ -1,27 +1,54 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
+const Location = require('./Location');
 
 /**
- * ParkingRate — aligned with teller.parking_rates (NOT public).
- * Created as dedicated table per domain schema migration.
+ * ParkingRate — aligned with parking_lot.parking_rates
  */
 const ParkingRate = sequelize.define(
   'ParkingRate',
   {
-    id:          { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    vehicleType: { type: DataTypes.STRING,  allowNull: false, unique: true },
-    hourlyRate:  { type: DataTypes.FLOAT,   allowNull: false },
-    dailyRate:   { type: DataTypes.FLOAT,   allowNull: false },
+    id: {
+      type: DataTypes.UUID,
+      primaryKey: true,
+      defaultValue: DataTypes.UUIDV4,
+    },
+    locationId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: 'location_id',
+      references: {
+        model: Location,
+        key: 'id',
+      },
+    },
+    type: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    rate: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+    createdAt: {
+      type: DataTypes.DATE,
+      field: 'createdAt',
+    },
+    updatedAt: {
+      type: DataTypes.DATE,
+      field: 'updatedAt',
+    },
   },
   {
-    tableName:  'parking_rates',
-    schema:     'teller',          // ← teller schema (NO public)
+    tableName: 'parking_rates',
+    schema: 'parking_lot',
     timestamps: true,
-    indexes: [
-      { name: 'teller_parking_rates_vehicle_type_unique', unique: true, fields: ['vehicleType'] },
-    ],
   }
 );
+
+// Establish relationships
+Location.hasMany(ParkingRate, { foreignKey: 'locationId', as: 'parkingRates' });
+ParkingRate.belongsTo(Location, { foreignKey: 'locationId', as: 'location' });
 
 ParkingRate.prototype.toJSON = function () {
   const values = Object.assign({}, this.get());

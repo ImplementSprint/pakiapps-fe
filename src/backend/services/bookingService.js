@@ -107,8 +107,14 @@ const createBooking = async ({
       resolvedSpot = spot || 'TBD';
     }
   } else {
-    const slot = await ParkingSlot.findByPk(resolvedSlotId, { attributes: ['id', 'label'] });
-    if (slot) resolvedSpot = slot.label;
+    const slot = await ParkingSlot.findByPk(resolvedSlotId, { attributes: ['id', 'label', 'location_id'] });
+    if (slot) {
+      resolvedSpot = slot.label;
+      // Ensure slot belongs to the correct location
+      if (slot.location_id && String(slot.location_id) !== String(locationId)) {
+        throw new Error('The selected parking slot does not belong to the specified location.');
+      }
+    }
   }
   if (!resolvedSpot) resolvedSpot = 'TBD';
 
@@ -125,8 +131,8 @@ const createBooking = async ({
 
   // ── 3. Fetch snapshots in parallel (3 lightweight PK lookups) ─────────────
   const [user, vehicle, location] = await Promise.all([
-    User.findOne({ where: { supabaseId: userId }, attributes: ['id', 'name', 'email', 'phone', 'discountPct'] }),
-    Vehicle.findByPk(parseInt(vehicleId), { attributes: ['id', 'brand', 'model', 'plateNumber', 'type', 'color'] }),
+    User.findOne({ where: { id: userId }, attributes: ['id', 'name', 'email', 'phone'] }),
+    Vehicle.findByPk(vehicleId, { attributes: ['id', 'brand', 'model', 'plateNumber', 'type', 'color'] }),
     Location.findByPk(locationId, { attributes: ['id', 'name', 'address'] }),
   ]);
 
@@ -137,11 +143,19 @@ const createBooking = async ({
     : amount;
 
   // ── 4. Create booking with all snapshot data inline ───────────────────────
-  const isOnlinePayment = paymentMethod === 'GCash' || paymentMethod === 'Maya';
-  
+  const ONLINE_METHODS = ['GCash', 'Maya', 'Credit/Debit Card'];
+  const isOnlinePayment = ONLINE_METHODS.includes(paymentMethod);
+
+  // Map UI payment method name → PayMongo API method name
+  const paymongoMethod =
+    paymentMethod === 'GCash'             ? 'gcash' :
+    paymentMethod === 'Maya'              ? 'paymaya' :
+    paymentMethod === 'Credit/Debit Card' ? 'card' :
+    paymentMethod.toLowerCase();
+
   const booking = await Booking.create({
     userId:        userId,
-    vehicleId:     parseInt(vehicleId),
+    vehicleId:     vehicleId || null,
     locationId:    locationId,
     parkingSlotId: resolvedSlotId,
     spot:          resolvedSpot,
@@ -177,9 +191,9 @@ const createBooking = async ({
       const paymentService = require('./paymentService');
       const session = await paymentService.createCheckoutSession({
         amount: finalAmount,
-        referenceId: booking.reference, // Hook automatically runs and populates reference!
+        referenceId: booking.reference,
         description: `PakiPark Reservation - Spot ${resolvedSpot}`,
-        method: paymentMethod, // 'GCash' or 'Maya'
+        method: paymongoMethod,
         successUrl: `${process.env.CLIENT_URL || 'http://localhost:3000'}/customer/book?reference=${booking.reference}&step=receipt`,
         cancelUrl: `${process.env.CLIENT_URL || 'http://localhost:3000'}/customer/book`
       });
@@ -194,8 +208,11 @@ const createBooking = async ({
     }
   }
 
-  // ── 5. Decrement available-spots counter ───────────────────────────────────
+  // ── 5. Decrement available-spots + mark slot as 'reserved' ─────────────────
   await Location.decrement('availableSpots', { by: 1, where: { id: locationId } });
+  if (resolvedSlotId) {
+    await ParkingSlot.update({ status: 'reserved' }, { where: { id: resolvedSlotId } });
+  }
 
   const plain    = booking.toJSON();
   const formatted = formatBooking(plain);
@@ -252,11 +269,30 @@ const updateBookingStatus = async (bookingId, status, cancelNote = 'Admin action
     throw new Error(`Cannot move booking from '${booking.status}' → '${status}'`);
   }
 
-  if (status === 'completed') {
-    await Location.increment('availableSpots', { by: 1, where: { id: booking.locationId } });
-  }
-  if (status === 'cancelled' && !isNoShowBooking(booking.toJSON())) {
-    await Location.increment('availableSpots', { by: 1, where: { id: booking.locationId } });
+  // Sync ParkingSlot.status based on the new booking status
+  if (booking.parkingSlotId) {
+    if (status === 'active') {
+      // Customer checked in → slot is physically occupied
+      await ParkingSlot.update({ status: 'occupied' }, { where: { id: booking.parkingSlotId } });
+    } else if (status === 'completed') {
+      // Customer checked out → slot is free again
+      await ParkingSlot.update({ status: 'available' }, { where: { id: booking.parkingSlotId } });
+      await Location.increment('availableSpots', { by: 1, where: { id: booking.locationId } });
+    } else if (status === 'cancelled') {
+      // Cancelled or no-show → release the slot
+      await ParkingSlot.update({ status: 'available' }, { where: { id: booking.parkingSlotId } });
+      if (!isNoShowBooking(booking.toJSON())) {
+        await Location.increment('availableSpots', { by: 1, where: { id: booking.locationId } });
+      }
+    }
+  } else {
+    // No specific slot assigned — only manage location counter
+    if (status === 'completed') {
+      await Location.increment('availableSpots', { by: 1, where: { id: booking.locationId } });
+    }
+    if (status === 'cancelled' && !isNoShowBooking(booking.toJSON())) {
+      await Location.increment('availableSpots', { by: 1, where: { id: booking.locationId } });
+    }
   }
 
   await booking.update({
@@ -407,6 +443,11 @@ const cancelBooking = async (bookingId, userId, reason) => {
     cancelReason,
     paymentStatus: newPaymentStatus,
   });
+
+  // Release the physical slot back to 'available'
+  if (booking.parkingSlotId) {
+    await ParkingSlot.update({ status: 'available' }, { where: { id: booking.parkingSlotId } });
+  }
 
   if (!wasNoShow) {
     await Location.increment('availableSpots', { by: 1, where: { id: booking.locationId } });

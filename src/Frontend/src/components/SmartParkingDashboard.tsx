@@ -493,7 +493,7 @@ export function SmartParkingDashboard() {
 
   // ─── Pricing editor ────────────────────────────────────────────────────────
   const [showPricingModal, setShowPricingModal] = useState(false);
-  const [pricingForm, setPricingForm] = useState({ freeHours: 2, overtimeRate: 15 });
+  const [pricingForm, setPricingForm] = useState({ basePrice: 50, freeHours: 2, overtimeRate: 15 });
   const [savingPricing, setSavingPricing] = useState(false);
 
   // Load saved pricing on location change
@@ -503,24 +503,27 @@ export function SmartParkingDashboard() {
     if (saved) {
       try { setPricingForm(JSON.parse(saved)); } catch { /* ignore */ }
     } else {
-      setPricingForm({ freeHours: 2, overtimeRate: 15 }); // defaults
+      // Seed basePrice from location record if available
+      const loc = locations.find((l: any) => l._id === selectedLocationId);
+      setPricingForm({ basePrice: loc?.hourlyRate ?? 50, freeHours: 2, overtimeRate: 15 });
     }
-  }, [selectedLocationId]);
+  }, [selectedLocationId, locations]);
 
   const handleSavePricing = async () => {
     setSavingPricing(true);
     try {
-      // Persist locally so teller / backend can read it
       localStorage.setItem(`pricing_${selectedLocationId}`, JSON.stringify(pricingForm));
-      // Also patch the location record so the API has the canonical value
+      // Save basePrice → pricePerHour column (via Sequelize alias: hourlyRate)
       await locationService.updateLocation(selectedLocationId, {
+        hourlyRate: pricingForm.basePrice,
         overtimeRatePerHour: pricingForm.overtimeRate,
         freeHours: pricingForm.freeHours,
       } as any);
-      toast.success(`Pricing updated: First ${pricingForm.freeHours}h free · ₱${pricingForm.overtimeRate}/hr after`);
+      // Refresh locations so the info bar reflects the new rate immediately
+      locationService.getLocations({ status: 'active' }).then(setLocations).catch(() => {});
+      toast.success(`Pricing saved: ₱${pricingForm.basePrice}/hr base · First ${pricingForm.freeHours}h free · ₱${pricingForm.overtimeRate}/hr after`);
       setShowPricingModal(false);
     } catch {
-      // Backend may not have these fields yet — still save locally
       localStorage.setItem(`pricing_${selectedLocationId}`, JSON.stringify(pricingForm));
       toast.success('Pricing saved locally.');
       setShowPricingModal(false);
@@ -852,13 +855,42 @@ export function SmartParkingDashboard() {
             <Button onClick={() => fetchSlots()} disabled={isLoading} variant="outline" className="rounded-xl h-9 px-3 font-bold border-gray-200 text-sm">
               <RefreshCw className={`size-3.5 mr-1.5 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
             </Button>
-            {selectedLocationId && parkingConfig?.isEvenLayout && parkingConfig?.evenConfig && (
+            {selectedLocationId && parkingConfig && (
               <Button onClick={async () => {
-                const evenCfg = parkingConfig.evenConfig!;
-                const sections = Array.from({ length: evenCfg.rows }, (_, i) => String.fromCodePoint(65 + i));
                 setIsSyncing(true);
-                try { await parkingSlotService.generateSlots({ locationId: selectedLocationId, sections, slotsPerSection: evenCfg.columns, floors: parkingConfig.floors }); toast.success('Synced!'); await fetchSlots(); }
-                catch { toast.error('Sync failed'); } finally { setIsSyncing(false); }
+                try {
+                  if (parkingConfig.floorConfigs?.length) {
+                    // Custom floor config — build explicit slot list
+                    const slots: any[] = [];
+                    parkingConfig.floorConfigs.forEach((floor: any) => {
+                      floor.rows.forEach((row: any) => {
+                        for (let i = 1; i <= row.slotCount; i++) {
+                          const category = row.categories?.[i] || 'regular';
+                          let dbType = 'regular';
+                          if (category === 'electric') dbType = 'ev_charging';
+                          else if (category === 'pwd') dbType = 'handicapped';
+                          else if (category === 'vip') dbType = 'vip';
+                          else if (category === 'motorcycle') dbType = 'motorcycle';
+                          let size = 'standard';
+                          if (category === 'motorcycle') size = 'compact';
+                          else if (category === 'electric' || category === 'vip') size = 'large';
+                          const shortLabel = `${row.rowLetter}${i}`;
+                          const label = parkingConfig.floors > 1 ? `F${floor.floor}-${shortLabel}` : shortLabel;
+                          slots.push({ label, section: row.rowLetter, floor: floor.floor, type: dbType, size, status: 'available', vehicleTypeAllowed: 'any' });
+                        }
+                      });
+                    });
+                    await parkingSlotService.generateSlots({ locationId: selectedLocationId, slots });
+                  } else if (parkingConfig.isEvenLayout && parkingConfig.evenConfig) {
+                    const evenCfg = parkingConfig.evenConfig!;
+                    const sections = Array.from({ length: evenCfg.rows }, (_: any, i: number) => String.fromCodePoint(65 + i));
+                    await parkingSlotService.generateSlots({ locationId: selectedLocationId, sections, slotsPerSection: evenCfg.columns, floors: parkingConfig.floors });
+                  } else {
+                    toast.error('No config found. Open Configure first.'); return;
+                  }
+                  toast.success('Slots synced to database!');
+                  await fetchSlots();
+                } catch { toast.error('Sync failed'); } finally { setIsSyncing(false); }
               }} disabled={isSyncing} variant="outline" className="rounded-xl h-9 px-3 font-bold border-[#1e3d5a]/30 text-[#1e3d5a] text-sm">
                 <RefreshCw className={`size-3.5 mr-1.5 ${isSyncing ? 'animate-spin' : ''}`} /> Sync DB
               </Button>
@@ -957,7 +989,7 @@ export function SmartParkingDashboard() {
           <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8 relative z-10">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 id="pricing-modal-title" className="text-xl font-black text-[#1e3d5a]">Overtime Pricing</h3>
+                <h3 id="pricing-modal-title" className="text-xl font-black text-[#1e3d5a]">Pricing Editor</h3>
                 <p className="text-xs text-gray-400 mt-0.5">Set rates for {selectedLocation?.name ?? 'this location'}</p>
               </div>
               <button onClick={() => setShowPricingModal(false)} className="text-gray-400 hover:text-gray-600">
@@ -966,6 +998,28 @@ export function SmartParkingDashboard() {
             </div>
 
             <div className="space-y-4">
+              {/* Base Price */}
+              <div className="bg-[#1e3d5a]/5 border border-[#1e3d5a]/20 rounded-2xl p-4">
+                <span className="block text-[10px] font-bold text-[#1e3d5a] uppercase tracking-widest mb-1">Base Price (₱/hr)</span>
+                <p className="text-xs text-gray-400 mb-3">Reservation rate charged per hour — saved to <code className="bg-gray-100 px-1 rounded text-[10px]">pricePerHour</code>.</p>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setPricingForm(p => ({ ...p, basePrice: Math.max(1, p.basePrice - 10) }))}
+                    className="size-9 rounded-xl bg-white border border-[#1e3d5a]/30 font-bold text-[#1e3d5a] hover:bg-[#1e3d5a]/5 flex items-center justify-center text-lg">
+                    −
+                  </button>
+                  <span className="text-3xl font-black text-[#1e3d5a] w-20 text-center">₱{pricingForm.basePrice}</span>
+                  <button onClick={() => setPricingForm(p => ({ ...p, basePrice: p.basePrice + 10 }))}
+                    className="size-9 rounded-xl bg-white border border-[#1e3d5a]/30 font-bold text-[#1e3d5a] hover:bg-[#1e3d5a]/5 flex items-center justify-center text-lg">
+                    +
+                  </button>
+                  <span className="text-sm text-gray-400 font-medium">/hr</span>
+                </div>
+                <input type="range" min={10} max={500} step={10}
+                  value={pricingForm.basePrice}
+                  onChange={e => setPricingForm(p => ({ ...p, basePrice: +e.target.value }))}
+                  className="w-full mt-3 accent-[#1e3d5a]"
+                />
+              </div>
               {/* Free hours */}
               <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
                 <span className="block text-[10px] font-bold text-green-700 uppercase tracking-widest mb-2">

@@ -7,19 +7,26 @@
  * Rates and hours target parking_lot.parking_rates and parking_lot.operating_hours.
  */
 const { Op } = require('sequelize');
-const { Location, Booking } = require('../models/index');
+const { Location } = require('../models/index');
 const { sequelize } = require('../config/db');
 
-// ── Helper: live available spots ─────────────────────────────────────────────
-// reservation.bookings.location_id is UUID → parking_lot.locations.id (UUID). Direct match.
-const recomputeAvailableSpots = async (hubId, totalSpots) => {
-  const activeCount = await Booking.count({
-    where: {
-      location_id: hubId,
-      status: { [Op.in]: ['upcoming', 'active'] },
-    },
-  });
-  return Math.max(0, totalSpots - activeCount);
+// ── Helper: compute slot counts directly from parking_lot.parking_slots ────────
+// Returns { total, available } by counting rows for the given locationId.
+// This is the canonical source of truth — NOT the denormalized location columns.
+const getSlotCounts = async (locationId) => {
+  const [rows] = await sequelize.query(
+    `SELECT
+       COUNT(*) FILTER (WHERE status != 'maintenance') AS total,
+       COUNT(*) FILTER (WHERE status = 'available')    AS available
+     FROM parking_lot.parking_slots
+     WHERE location_id = :locationId`,
+    { replacements: { locationId } }
+  );
+  const row = rows[0] || {};
+  return {
+    total:     parseInt(row.total     || 0, 10),
+    available: parseInt(row.available || 0, 10),
+  };
 };
 
 // ── Core scoping helper ────────────────────────────────────────────────────────
@@ -48,28 +55,19 @@ async function getScopedHubIds(user) {
   }
 
   if (user.role === 'teller') {
-    let rows = [];
+    // Tellers are linked to a location via account.profiles.location_id
     try {
-      [rows] = await sequelize.query(
-        `SELECT DISTINCT location_id AS hub_id
-         FROM parking_lot.parking_slots
-         WHERE "tellerUserId" = :authId`,
+      const [rows] = await sequelize.query(
+        `SELECT location_id AS hub_id
+         FROM account.profiles
+         WHERE id = :authId AND location_id IS NOT NULL`,
         { replacements: { authId: user.authId } }
       );
+      return { hubIds: rows.map(r => r.hub_id) };
     } catch (err) {
-      // column doesn't exist, ignore
+      console.warn('[getScopedHubIds] teller profile query failed:', err.message);
     }
-    // Fallback to routing.parking_slots if parking_lot is empty/missing column
-    if (rows.length === 0) {
-        try {
-            const [rows2] = await sequelize.query(
-                `SELECT DISTINCT "locationId" AS hub_id FROM routing.parking_slots WHERE "tellerUserId" = :authId`,
-                { replacements: { authId: user.authId } }
-            );
-            return { hubIds: rows2.map(r => r.hub_id) };
-        } catch (e) {}
-    }
-    return { hubIds: rows.map(r => r.hub_id) };
+    return { hubIds: [] };
   }
 
   return { hubIds: [] }; // unknown role → no access
@@ -102,8 +100,12 @@ const getLocations = async (req, res) => {
     const enriched = await Promise.all(
       locations.map(async (loc) => {
         const json = loc.toJSON();
-        json.availableSpots = await recomputeAvailableSpots(loc.id, loc.totalSpots);
-        
+
+        // Compute total & available from the actual parking_slots rows
+        const counts = await getSlotCounts(loc.id);
+        json.totalSpots     = counts.total;
+        json.availableSpots = counts.available;
+
         // Fetch actual rate from parking_lot.parking_rates
         const [rateRows] = await sequelize.query(
             `SELECT rate FROM parking_lot.parking_rates WHERE location_id = :id AND type = 'hourly' LIMIT 1`,
@@ -135,7 +137,11 @@ const getLocation = async (req, res) => {
     }
 
     const json = location.toJSON();
-    json.availableSpots = await recomputeAvailableSpots(location.id, location.totalSpots);
+
+    // Compute total & available from the actual parking_slots rows
+    const counts = await getSlotCounts(location.id);
+    json.totalSpots     = counts.total;
+    json.availableSpots = counts.available;
     
     const [rateRows] = await sequelize.query(
         `SELECT rate FROM parking_lot.parking_rates WHERE location_id = :id AND type = 'hourly' LIMIT 1`,

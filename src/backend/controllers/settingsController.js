@@ -33,7 +33,7 @@ const updateSettings = async (req, res) => {
 // GET /api/settings/parking-rates
 const getParkingRates = async (req, res) => {
   try {
-    const rates = await ParkingRate.findAll({ order: [['vehicleType', 'ASC']] });
+    const rates = await ParkingRate.findAll({ order: [['type', 'ASC']] });
     res.json({ success: true, data: rates.map((r) => r.toJSON()) });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

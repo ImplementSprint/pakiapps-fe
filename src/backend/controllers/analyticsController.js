@@ -6,21 +6,39 @@
  * All other queries are already single-table or aggregate-only.
  */
 
-const { QueryTypes } = require('sequelize');
+const { QueryTypes, Op } = require('sequelize');
 const { sequelize }  = require('../config/db');
 const { Booking, User, Location } = require('../models/index');
 
 // GET /api/analytics/dashboard
+const { getScopedHubIds } = require('./locationController');
+
 const getDashboardStats = async (req, res) => {
   try {
-    const [totalBookings, activeUsers, totalLocations, parkingSpots, revenue] = await Promise.all([
-      Booking.count(),
-      User.count({ where: { role: 'customer' } }),
-      Location.count({ where: { status: 'active' } }),
-      Location.sum('totalSpots').then((v) => v || 0),
-      Booking.sum('amount', { where: { paymentStatus: 'paid' } }).then((v) => v || 0),
+    const scoped = await getScopedHubIds(req.user);
+    const where = {};
+    if (scoped !== null) {
+      if (scoped.hubIds.length === 0) {
+        return res.json({
+          success: true,
+          data: { total: 0, active: 0, upcoming: 0, completed: 0, cancelled: 0 }
+        });
+      }
+      where.locationId = scoped.hubIds;
+    }
+
+    const [total, active, upcoming, completed, cancelled] = await Promise.all([
+      Booking.count({ where }),
+      Booking.count({ where: { ...where, status: 'active' } }),
+      Booking.count({ where: { ...where, status: 'upcoming' } }),
+      Booking.count({ where: { ...where, status: 'completed' } }),
+      Booking.count({ where: { ...where, status: { [Op.or]: ['cancelled', 'no_show'] } } }),
     ]);
-    res.json({ success: true, data: { totalBookings, activeUsers, parkingSpots, totalLocations, revenue } });
+
+    res.json({
+      success: true,
+      data: { total, active, upcoming, completed, cancelled }
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
