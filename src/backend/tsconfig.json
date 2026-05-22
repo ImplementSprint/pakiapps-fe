@@ -3,6 +3,6 @@
     "checkJs": false,
     "noEmit": true
   },
-  "include": [],
-  "exclude": ["**/*"]
+  "include": ["**/*.js"],
+  "exclude": ["node_modules"]
 }

@@ -7,15 +7,19 @@
 
 const { Op }      = require('sequelize');
 const { sequelize } = require('../config/db');
-const { Booking, Location, ParkingSlot } = require('../models/index');
+const { Booking, Location, ParkingSlot, User } = require('../models/index');
 const { logBookingNoShow }  = require('./logService');
 const { formatBooking }     = require('../utils/formatters');
 const notificationService   = require('./notificationService');
+const emailService          = require('./emailService');
+const smsService            = require('./smsService');
 
 const GRACE_PERIOD_MIN = 15;  // must match timeUtils.js constant
 
 // In-memory registry to track reminder notification deliveries safely without DB columns
 const sentReminders = new Set();
+const sentOvertimeWarnings = new Set();
+const sentOvertimeConsumed = new Set();
 
 /** Convert "HH:MM - HH:MM" → Date object for the START time on a given date string */
 function slotStartDate(dateStr, timeSlot) {
@@ -142,18 +146,89 @@ async function runReminderSweep() {
 }
 
 /**
+ * Overtime sweep — fires once per active booking when it is 15 min from 2 hrs, and again at 2 hrs.
+ */
+async function runOvertimeSweep() {
+  try {
+    const activeBookings = await Booking.findAll({
+      where: {
+        status: 'active',
+        checkInAt: { [Op.ne]: null },
+      },
+      raw: true,
+    });
+
+    if (activeBookings.length === 0) return;
+
+    const nowMs = Date.now();
+    const FREE_HOURS_MS = 2 * 60 * 60 * 1000;
+    const WARNING_MS = 15 * 60 * 1000;
+
+    for (const b of activeBookings) {
+      const checkInMs = new Date(b.checkInAt).getTime();
+      const elapsedMs = nowMs - checkInMs;
+      
+      let needsWarning = false;
+      let needsConsumed = false;
+
+      if (elapsedMs >= FREE_HOURS_MS && !sentOvertimeConsumed.has(b.id)) {
+        needsConsumed = true;
+      } else if (elapsedMs >= (FREE_HOURS_MS - WARNING_MS) && elapsedMs < FREE_HOURS_MS && !sentOvertimeWarnings.has(b.id)) {
+        needsWarning = true;
+      }
+
+      if (needsWarning || needsConsumed) {
+        const fmt = formatBooking(b);
+        const user = await User.findByPk(b.userId, { raw: true });
+        if (user) {
+          fmt.userName = user.name;
+          fmt.userEmail = user.email;
+          fmt.userPhone = user.phone;
+        }
+
+        if (needsConsumed) {
+          sentOvertimeConsumed.add(b.id);
+          notificationService.notifyOvertimeConsumed(b.userId, { ...fmt, id: b.id });
+          if (fmt.userEmail) emailService.sendOvertimeConsumedEmail(fmt.userEmail, fmt).catch(()=>{});
+          if (fmt.userPhone) smsService.sendOvertimeConsumedSMS(fmt.userPhone, fmt).catch(()=>{});
+          console.log(`[Overtime] ⏳ Sent overtime consumed notice for booking ${b.reference} (user ${b.userId})`);
+        } else if (needsWarning) {
+          sentOvertimeWarnings.add(b.id);
+          notificationService.notifyOvertimeWarning(b.userId, { ...fmt, id: b.id });
+          if (fmt.userEmail) emailService.sendOvertimeWarningEmail(fmt.userEmail, fmt).catch(()=>{});
+          if (fmt.userPhone) smsService.sendOvertimeWarningSMS(fmt.userPhone, fmt).catch(()=>{});
+          console.log(`[Overtime] ⚠️ Sent 15-min overtime warning for booking ${b.reference} (user ${b.userId})`);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Overtime] ❌ Sweep error:', err.message);
+  }
+}
+
+/**
  * Start the forfeiture + reminder scheduler.
  */
 function startForfeitureScheduler() {
   console.log(`[Forfeiture] 🕐 Scheduler started — grace period: ${GRACE_PERIOD_MIN} min, sweep: every 60s`);
 
+  // Disable background schedulers during dev so they don't spam emails on every restart
+  /*
+  cron.schedule('* * * * *', sweepForfeiture);
+  cron.schedule('* * * * *', sweepReminders);
+  cron.schedule('* * * * *', sweepOvertime);
+  */
+  console.log('✅  [Scheduler] Forfeiture + Reminder sweeps temporarily PAUSED during dev');
+
   runForfeitureSweep();
   runReminderSweep();
+  runOvertimeSweep();
 
   setInterval(() => {
     runForfeitureSweep();
     runReminderSweep();
+    runOvertimeSweep();
   }, 60 * 1000);
 }
 
-module.exports = { startForfeitureScheduler, runForfeitureSweep, runReminderSweep };
+module.exports = { startForfeitureScheduler, runForfeitureSweep, runReminderSweep, runOvertimeSweep };

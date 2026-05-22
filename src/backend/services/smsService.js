@@ -165,6 +165,10 @@ async function sendPasswordResetOTPByEmail(rawEmail) {
   const otp   = generateOTP();
 
   otpStore.set(email, { otp, expiresAt: Date.now() + OTP_TTL_MS });
+  
+  console.log(`\n================================`);
+  console.log(`🔑 DEV OTP FOR ${email}: ${otp}`);
+  console.log(`================================\n`);
 
   try {
     await emailService.sendOTPEmail(email, otp);
@@ -185,6 +189,16 @@ const sendBookingConfirmationSMS = async (rawPhone, bookingData) => {
 
 const sendBookingReminderSMS = async (rawPhone, bookingData) => {
   const message = `PakiPark Reminder: Your parking at ${bookingData.locationName} (Spot ${bookingData.spot}) starts ${bookingData.timeSlot} on ${bookingData.date}. Ref: ${bookingData.reference}.`;
+  await sendSMS(rawPhone, message, 'notification');
+};
+
+const sendOvertimeWarningSMS = async (rawPhone, bookingData) => {
+  const message = `PakiPark Warning: Your free parking at ${bookingData.locationName} (Spot ${bookingData.spot}) expires in 15 mins. Pls check out to avoid PHP 15/hr charge. Ref: ${bookingData.reference}.`;
+  await sendSMS(rawPhone, message, 'notification');
+};
+
+const sendOvertimeConsumedSMS = async (rawPhone, bookingData) => {
+  const message = `PakiPark Notice: Free parking at ${bookingData.locationName} (Spot ${bookingData.spot}) consumed. Overtime charge of PHP 15/hr applies. Ref: ${bookingData.reference}.`;
   await sendSMS(rawPhone, message, 'notification');
 };
 
@@ -217,6 +231,8 @@ module.exports = {
   sendPasswordResetOTPByEmail,
   sendBookingConfirmationSMS,
   sendBookingReminderSMS,
+  sendOvertimeWarningSMS,
+  sendOvertimeConsumedSMS,
   verifyOTP,
   consumeOTP,
   isVerified,

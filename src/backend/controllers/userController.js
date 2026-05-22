@@ -200,6 +200,20 @@ const requestVerificationOTP = async (req, res) => {
 
     // In a real app we'd send an SMS/Email here. For now, simulate:
     console.log(`[OTP] Sent ${otp} to ${channel === 'email' ? user.email : user.phone}`);
+    
+    // Actually send the email/SMS using our services
+    try {
+      if (channel === 'email') {
+        const emailService = require('../services/emailService');
+        await emailService.sendOTPEmail(user.email, otp);
+      } else if (channel === 'sms') {
+        const smsService = require('../services/smsService');
+        await smsService.sendSMS(user.phone, `Your PakiPark verification code is: ${otp}. Valid for 10 minutes.`, 'otp');
+      }
+    } catch (err) {
+      console.error(`[OTP Delivery Failed]: ${err.message}`);
+      // Fallback silently so the user can still use the console-logged DEV OTP
+    }
 
     res.json({ success: true, message: `OTP sent to your ${channel}. (Check console for code)` });
   } catch (error) {

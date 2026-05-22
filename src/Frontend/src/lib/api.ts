@@ -3,7 +3,7 @@
  * Next.js version — uses NEXT_PUBLIC_API_URL env var
  */
 
-const API_BASE_URL = '/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api';
 
 interface ApiResponse<T = any> {
   success: boolean;

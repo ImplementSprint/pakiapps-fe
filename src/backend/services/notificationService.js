@@ -25,7 +25,7 @@ const { Notification } = require('../models/index');
  */
 async function notify(userId, type, title, body, entityType = null, entityId = null) {
   try {
-    return await Notification.create({ userId, type, title, body, entityType, entityId });
+    return await Notification.create({ userId, type, title, message: body, entityType, entityId });
   } catch (err) {
     console.warn('[Notification] Write failed:', err.message);
     return null;
@@ -116,6 +116,28 @@ function notifySystem(userId, title, body) {
   return notify(userId, 'system', title, body, null, null);
 }
 
+function notifyOvertimeWarning(userId, booking) {
+  return notify(
+    userId,
+    'overtime_warning',
+    '⚠️ 15 Mins to Overtime',
+    `Your free parking window at ${booking.locationName} ends in 15 minutes. Check out soon to avoid charges.`,
+    'Booking',
+    booking.id || booking._id
+  );
+}
+
+function notifyOvertimeConsumed(userId, booking) {
+  return notify(
+    userId,
+    'overtime_consumed',
+    '⏳ Overtime Started',
+    `Your free parking window at ${booking.locationName} has ended. Overtime rate of ₱15/hr applies.`,
+    'Booking',
+    booking.id || booking._id
+  );
+}
+
 module.exports = {
   notify,
   notifyBookingConfirmed,
@@ -126,4 +148,6 @@ module.exports = {
   notifyDiscountRejected,
   notifyRegistrationRejected,
   notifySystem,
+  notifyOvertimeWarning,
+  notifyOvertimeConsumed,
 };

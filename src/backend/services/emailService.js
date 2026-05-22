@@ -170,6 +170,30 @@ const sendOTPEmail = async (userEmail, otp) => {
   await sendEmail(userEmail, 'Your PakiPark Verification Code', html);
 };
 
+/**
+ * Overtime warning email (sent 15 mins before free hours end).
+ */
+const sendOvertimeWarningEmail = async (userEmail, bookingData) => {
+  const html = _wrap(`
+    <h2 style="color: #f39c12; margin-top: 0;">⚠️ Parking Time Almost Up</h2>
+    <p style="color: #444;">Hi <strong>${bookingData.userName || 'there'}</strong>, your free 2-hour parking window for slot <strong>${bookingData.spot}</strong> at <strong>${bookingData.location || bookingData.locationName}</strong> will expire in 15 minutes.</p>
+    <p style="color: #666; font-size: 13px;">Please check out soon to avoid overtime charges of ₱15/hour.</p>
+  `);
+  await sendEmail(userEmail, `Parking Time Almost Up — ${bookingData.reference}`, html);
+};
+
+/**
+ * Overtime consumed email (sent when free hours are fully consumed).
+ */
+const sendOvertimeConsumedEmail = async (userEmail, bookingData) => {
+  const html = _wrap(`
+    <h2 style="color: #c0392b; margin-top: 0;">⏳ Overtime Started</h2>
+    <p style="color: #444;">Hi <strong>${bookingData.userName || 'there'}</strong>, your free 2-hour parking window for slot <strong>${bookingData.spot}</strong> at <strong>${bookingData.location || bookingData.locationName}</strong> has been consumed.</p>
+    <p style="color: #666; font-size: 13px;">You are now being billed at the overtime rate of ₱15/hour.</p>
+  `);
+  await sendEmail(userEmail, `Overtime Started — ${bookingData.reference}`, html);
+};
+
 module.exports = {
   sendEmail,
   sendBookingConfirmation,
@@ -177,4 +201,6 @@ module.exports = {
   sendPasswordReset,
   sendBookingReminder,
   sendOTPEmail,
+  sendOvertimeWarningEmail,
+  sendOvertimeConsumedEmail,
 };

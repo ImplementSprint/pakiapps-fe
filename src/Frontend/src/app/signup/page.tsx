@@ -37,7 +37,7 @@ export default function SignUpPage() {
       setCheckingId(true);
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/auth/check-identifier?value=${encodeURIComponent(identifier)}`
+          `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/check-identifier?value=${encodeURIComponent(identifier)}`
         );
         const data = await res.json();
         setIdentifierTaken(!data.available);
