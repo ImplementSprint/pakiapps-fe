@@ -253,7 +253,7 @@ function CheckoutModal({ booking, onConfirm, onCancel, isLoading }: {
       <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-300">
 
         {/* Header band */}
-        <div className="bg-gradient-to-r from-[#1e3d5a] to-[#2a5373] px-8 pt-8 pb-12 text-center relative">
+        <div className="bg-gradient-to-r from-[#1e3d5a] to-[#2a5373] px-8 py-8 text-center relative">
           <div className="size-16 rounded-2xl bg-white/10 flex items-center justify-center mx-auto mb-3 backdrop-blur-sm">
             <Receipt className="size-8 text-white" />
           </div>
@@ -263,17 +263,18 @@ function CheckoutModal({ booking, onConfirm, onCancel, isLoading }: {
           </p>
         </div>
 
-        <div className="px-8 -mt-6 pb-8">
-          {/* Amount pill */}
-          <div className={`rounded-2xl px-6 py-4 mb-5 text-center shadow-lg border-4 border-white ${isFree ? 'bg-green-500' : 'bg-[#ee6b20]'}`}>
-            {isFree
-              ? <p className="text-4xl font-black text-white">FREE</p>
-              : <p className="text-4xl font-black text-white">₱{p.finalAmount}</p>
-            }
-            <p className="text-xs font-bold text-white/80 mt-0.5">
-              {isFree ? `Within ${FREE_HOURS}-hour free window` : `First ${FREE_HOURS} hrs free · ₱${RATE_PER_HOUR}/hr after`}
-            </p>
-          </div>
+        {/* Amount band */}
+        <div className={`px-8 py-4 text-center ${isFree ? 'bg-green-500' : 'bg-[#ee6b20]'}`}>
+          {isFree
+            ? <p className="text-4xl font-black text-white shadow-sm">FREE</p>
+            : <p className="text-4xl font-black text-white shadow-sm">₱{p.finalAmount}</p>
+          }
+          <p className="text-xs font-bold text-white/90 mt-0.5">
+            {isFree ? `Within ${FREE_HOURS}-hour free window` : `First ${FREE_HOURS} hrs free · ₱${RATE_PER_HOUR}/hr after`}
+          </p>
+        </div>
+
+        <div className="p-8">
 
           {/* Time grid */}
           <div className="grid grid-cols-2 gap-2 mb-4">
@@ -308,7 +309,7 @@ function CheckoutModal({ booking, onConfirm, onCancel, isLoading }: {
               }`}>
               {isLoading
                 ? <span className="flex items-center justify-center gap-2"><RefreshCw className="size-4 animate-spin" />Processing…</span>
-                : isFree ? 'Confirm Check-Out · FREE' : `Confirm · ₱${p.finalAmount}`}
+                : isFree ? 'Final Check-Out · FREE' : `Final Check-Out · ₱${p.finalAmount}`}
             </button>
           </div>
         </div>

@@ -73,18 +73,27 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
 
       // Restore available_spots in parking_lot.locations — no public schema
       const perLocation: Record<string, number> = {};
+      const slotIdsToRestore: string[] = [];
       toForfeit.forEach((b) => {
         const lid = (b as any).locationId;
         if (lid) perLocation[String(lid)] = (perLocation[String(lid)] || 0) + 1;
+        const sid = (b as any).parkingSlotId;
+        if (sid) slotIdsToRestore.push(String(sid));
       });
-      await Promise.all(
-        Object.entries(perLocation).map(([locId, count]) =>
+      await Promise.all([
+        ...Object.entries(perLocation).map(([locId, count]) =>
           this.sequelize.query(
             `UPDATE parking_lot.locations SET available_spots = available_spots + :count WHERE id = :id`,
             { replacements: { count, id: locId } },
-          ),
+          )
         ),
-      );
+        slotIdsToRestore.length > 0
+          ? this.sequelize.query(
+              `UPDATE parking_lot.parking_slots SET status = 'available' WHERE id IN (:slotIds)`,
+              { replacements: { slotIds: slotIdsToRestore } },
+            )
+          : Promise.resolve(),
+      ]);
 
       // Notify & log
       for (const b of toForfeit) {

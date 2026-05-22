@@ -211,6 +211,20 @@ export class BookingService {
       distinct: true,
     });
 
+    // Sync payment status dynamically for any pending bookings returned
+    for (const b of rows) {
+      if (b.paymentStatus === 'pending' && b.paymentSessionId) {
+        try {
+          const payment = await this.paymentSvc.getPaymentStatus(b.paymentSessionId);
+          if (payment && payment.status === 'paid') {
+            await b.update({ paymentStatus: 'paid' });
+          }
+        } catch (err) {
+          console.warn('[SyncPayment] Failed to sync payment status:', err.message);
+        }
+      }
+    }
+
     // Fetch all slot floors to dynamically map floor to each booking
     const [slots]: [any[], unknown] = await this.sequelize.query(
       `SELECT id, label, floor FROM parking_lot.parking_slots`
@@ -266,12 +280,25 @@ export class BookingService {
   }
 
   async getBookingById(id: string, user: any): Promise<any> {
-    const booking = await this.bookingModel.findByPk(id, { raw: true });
+    const booking = await this.bookingModel.findByPk(id);
     if (!booking) throw new Error('Booking not found');
+    
+    // Sync payment status dynamically
+    if (booking.paymentStatus === 'pending' && booking.paymentSessionId) {
+      try {
+        const payment = await this.paymentSvc.getPaymentStatus(booking.paymentSessionId);
+        if (payment && payment.status === 'paid') {
+          await booking.update({ paymentStatus: 'paid' });
+        }
+      } catch (err) {
+        console.warn('[SyncPayment] Failed to sync payment status:', err.message);
+      }
+    }
+
     // Customers may only see their own
-    if (user.role === 'customer' && (booking as any).userId !== user.authId)
+    if (user.role === 'customer' && booking.userId !== user.authId)
       throw new Error('Not authorized');
-    return { ...formatBooking(booking), timing: computeTimingMeta(booking) };
+    return { ...formatBooking(booking.toJSON()), timing: computeTimingMeta(booking.toJSON()) };
   }
 
   async cancelBooking(id: string, user: any, reason?: string): Promise<any> {
@@ -355,14 +382,21 @@ export class BookingService {
     const booking = await this.bookingModel.findByPk(id);
     if (!booking) throw new Error('Booking not found');
     if (booking.status !== 'active') throw new Error('Only active bookings can be checked out');
-    const now = new Date();
-    const [, end] = String(booking.timeSlot).split('-');
-    const [eh, em] = (end || '23:59').trim().split(':').map(Number);
-    const endMs = new Date(`${booking.date}T${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}:00`).getTime();
-    const overtimeMs  = Math.max(0, now.getTime() - endMs);
-    const overtimeFee = Math.round((overtimeMs / 3_600_000) * 15 * 100) / 100;
-    const finalAmount = (booking.amount || 0) + overtimeFee;
-    await booking.update({ status: 'completed', checkOutAt: now });
+    
+    const checkInAt    = booking.checkInAt ? new Date(booking.checkInAt) : new Date();
+    const checkOutAt   = new Date();
+    const elapsedMs    = Math.max(0, checkOutAt.getTime() - checkInAt.getTime());
+    const elapsedHrs   = elapsedMs / (1000 * 60 * 60);
+    
+    const FREE_HOURS    = 2;   // first 2 hours are free
+    const RATE_PER_HOUR = 15;  // ₱15 per overtime hour
+    
+    const overtimeHrs  = Math.max(0, elapsedHrs - FREE_HOURS);   // hours beyond the free window
+    const billableHrs  = Math.ceil(overtimeHrs);                  // round up to next hour
+    const finalAmount  = billableHrs * RATE_PER_HOUR;             // ₱0 if still within 2 hrs
+
+    await booking.update({ status: 'completed', checkOutAt, finalAmount });
+
     // Restore spot
     await this.sequelize.query(
       `UPDATE parking_lot.locations SET available_spots = available_spots + 1 WHERE id = :id`,
@@ -375,9 +409,32 @@ export class BookingService {
         { replacements: { slotId: (booking as any).parkingSlotId } }
       );
     }
+    
     const formatted = formatBooking(booking.toJSON());
     this.logSvc.logBookingCheckOut({ booking: formatted, adminId: staffUser.authId });
-    return { ...formatted, overtimeFee, overtimeMinutes: Math.round(overtimeMs / 60_000), finalAmount };
+    
+    const durationMins = Math.round(elapsedMs / 60000);
+    const overtimeMins = Math.max(0, durationMins - FREE_HOURS * 60);
+
+    return {
+      ...formatted,
+      billing: {
+        checkInAt:      checkInAt.toISOString(),
+        checkOutAt:     checkOutAt.toISOString(),
+        durationMins,
+        durationLabel:  durationMins < 60
+          ? `${durationMins} min`
+          : `${Math.floor(durationMins / 60)}h ${durationMins % 60}m`,
+        freeHours:      FREE_HOURS,
+        overtimeMins,
+        overtimeLabel:  overtimeMins <= 0 ? 'None'
+          : overtimeMins < 60 ? `${overtimeMins} min`
+          : `${Math.floor(overtimeMins / 60)}h ${overtimeMins % 60}m`,
+        ratePerHour:    RATE_PER_HOUR,
+        billableHours:  billableHrs,
+        finalAmount,
+      }
+    };
   }
 
   async getAvailableSlots(locationId: string, date: string): Promise<any> {
