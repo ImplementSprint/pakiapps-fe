@@ -10,20 +10,20 @@ import { toast } from 'sonner';
 export default function SignUpPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm]   = useState(false);
-  const [identifier, setIdentifier]     = useState('');
-  const [formData, setFormData]         = useState({ firstName: '', lastName: '', password: '', confirm: '' });
-  const [errors, setErrors]             = useState({ identifier: '', password: '', confirm: '' });
-  const [isLoading, setIsLoading]       = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [identifier, setIdentifier] = useState('');
+  const [formData, setFormData] = useState({ firstName: '', lastName: '', password: '', confirm: '' });
+  const [errors, setErrors] = useState({ identifier: '', password: '', confirm: '' });
+  const [isLoading, setIsLoading] = useState(false);
   const [identifierTaken, setIdentifierTaken] = useState(false);
-  const [checkingId, setCheckingId]     = useState(false);
+  const [checkingId, setCheckingId] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isPhone = /^\d/.test(identifier) && !identifier.includes('@');
 
   // Auto-capitalize: first letter of every word
   const toTitleCase = (str: string) =>
-    str.replace(/\b\w+/g, word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+    str.replace(/\b\w/g, c => c.toUpperCase());
 
   // ── Debounced live-check ──────────────────────────────────────────────────
   useEffect(() => {
@@ -51,7 +51,7 @@ export default function SignUpPage() {
     }, 600);
 
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identifier]);
 
   const validatePassword = (pwd: string) => {
@@ -61,21 +61,13 @@ export default function SignUpPage() {
     return '';
   };
 
-  const normalizePhone = (val: string) => {
-    // Strip everything except digits
-    let digits = val.replace(/\D/g, '');
-    // PH users naturally type 09XXXXXXXXX — strip leading 0 since +63 is already shown
-    if (digits.startsWith('0')) digits = digits.slice(1);
-    return digits.slice(0, 10); // cap at 10 digits
-  };
-
   const handleIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
-    // Detect phone: pure digits (possibly with leading 0)
-    if (/^\d/.test(val) && !val.includes('@')) {
-      const normalized = normalizePhone(val);
-      setIdentifier(normalized);
-      setErrors(prev => ({ ...prev, identifier: normalized.length > 0 && normalized.length < 10 ? 'Mobile number must be exactly 10 digits.' : '' }));
+    if (/^\d+$/.test(val) && !val.includes('@')) {
+      if (val.length <= 10) {
+        setIdentifier(val);
+        setErrors(prev => ({ ...prev, identifier: val.length > 0 && val.length < 10 ? 'Mobile number must be exactly 10 digits.' : '' }));
+      }
     } else {
       setIdentifier(val);
       setErrors(prev => ({ ...prev, identifier: '' }));
@@ -96,9 +88,12 @@ export default function SignUpPage() {
 
     setIsLoading(true);
     try {
-      const payload = isPhone
-        ? { firstName: formData.firstName, lastName: formData.lastName, phone: `+63${identifier}`, password: formData.password }
-        : { firstName: formData.firstName, lastName: formData.lastName, email: identifier,          password: formData.password };
+      const payload: any = { firstName: formData.firstName, lastName: formData.lastName, password: formData.password };
+      if (isPhone) {
+        payload.phone = `+63${identifier}`;
+      } else {
+        payload.email = identifier;
+      }
       await authService.register(payload);
       toast.success('Account created! Please log in to continue.');
       router.push('/login');
@@ -178,7 +173,7 @@ export default function SignUpPage() {
                   <label className="text-[10px] font-bold text-[#1e3d5a] tracking-widest uppercase mb-1.5 block opacity-70">Last Name</label>
                   <div className="relative">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-[#8492a6]" />
-                    <input type="text" placeholder="dela Cruz" required
+                    <input type="text" placeholder="Dela Cruz" required
                       className="h-12 w-full pl-12 bg-[#f8fafc] border border-[#e2e8f0] rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3d5a]/20"
                       value={formData.lastName}
                       onChange={e => setFormData({ ...formData, lastName: toTitleCase(e.target.value) })} />
@@ -195,10 +190,9 @@ export default function SignUpPage() {
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8492a6]">
                       {isPhone ? <Phone className="size-5" /> : <Mail className="size-5" />}
                     </div>
-                  <input type="text" placeholder="name@email.com or 9123456789" required
-                      className={`h-12 w-full pl-12 bg-[#f8fafc] border ${
-                        errors.identifier || identifierTaken ? 'border-red-400 ring-1 ring-red-300' : 'border-[#e2e8f0]'
-                      } rounded-2xl text-sm focus:outline-none focus:ring-2 ${errors.identifier || identifierTaken ? 'focus:ring-red-300' : 'focus:ring-[#1e3d5a]/20'} transition-all`}
+                    <input type="text" placeholder="name@email.com or 9123456789" required
+                      className={`h-12 w-full pl-12 bg-[#f8fafc] border ${errors.identifier || identifierTaken ? 'border-red-400 ring-1 ring-red-300' : 'border-[#e2e8f0]'
+                        } rounded-2xl text-sm focus:outline-none focus:ring-2 ${errors.identifier || identifierTaken ? 'focus:ring-red-300' : 'focus:ring-[#1e3d5a]/20'} transition-all`}
                       value={identifier} onChange={handleIdentifierChange} />
                   </div>
                 </div>

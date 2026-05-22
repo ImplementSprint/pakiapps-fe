@@ -34,7 +34,17 @@ class ApiClient {
     const url = `${this.baseUrl}${endpoint}`;
     try {
       const response = await fetch(url, { ...options, headers: { ...this.getHeaders(), ...options.headers } });
-      const data = await response.json();
+      let data: any;
+      const text = await response.text();
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (e) {
+        if (!response.ok) {
+          throw new Error(text === 'Internal Server Error' ? 'The server is temporarily unavailable. It might be restarting.' : text || 'An unexpected error occurred.');
+        }
+        data = { success: true }; // Fallback for 2xx empty responses
+      }
+
       if (!response.ok || (data && data.success === false)) {
         // Global 401 handler: log out user ONLY if it wasn't the login endpoint itself failing
         if (response.status === 401 && typeof window !== 'undefined' && !endpoint.includes('/auth/login')) {

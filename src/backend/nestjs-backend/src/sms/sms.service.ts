@@ -243,6 +243,13 @@ export class SmsService {
     });
   }
 
+  // ── General SMS ────────────────────────────────────────────────────────────
+
+  async sendSms(phone: string, message: string): Promise<void> {
+    const canonical = this.normPhone(phone);
+    await this._sendSms(canonical, message);
+  }
+
   // ── SMS OTP ────────────────────────────────────────────────────────────────
 
   async sendPasswordResetOTP(phone: string): Promise<string> {
