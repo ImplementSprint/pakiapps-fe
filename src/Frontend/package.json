@@ -8,8 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
-    "test": "jest --testPathPattern=tests/unit --coverageReporters=json-summary --forceExit",
-    "test:ci": "jest --testPathPattern=tests/unit --coverageReporters=json-summary --ci --forceExit"
+    "test": "jest --testPathPattern=tests/unit --coverage --coverageReporters=json-summary --forceExit",
+    "test:ci": "jest --testPathPattern=tests/unit --coverage --coverageReporters=json-summary --ci --forceExit"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
