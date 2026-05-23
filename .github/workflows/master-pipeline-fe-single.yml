@@ -1,0 +1,20 @@
+name: Master Pipeline (Frontend Single)
+
+on:
+  push:
+    branches:
+      - test
+      - uat
+      - main
+  pull_request:
+    branches:
+      - test
+      - uat
+      - main
+
+jobs:
+  Call_Workflow:
+    uses: ImplementSprint/CICD-Fe_Single-test/.github/workflows/fe-single-pipeline.yml@main
+    secrets: inherit
+    with:
+      fe_single_system_json: ${{ vars.FE_SINGLE_SYSTEM_JSON }}
