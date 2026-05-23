@@ -45,6 +45,7 @@ export interface Location {
   address?: string;
   totalSpots?: number;
   availableSpots?: number;
+  hourlyRate?: number | string;
   overtimeRatePerHour?: number;
   freeHours?: number;
   operatingHours?: any;
@@ -505,7 +506,7 @@ export function SmartParkingDashboard() {
     } else {
       // Seed basePrice from location record if available
       const loc = locations.find((l: any) => l._id === selectedLocationId);
-      setPricingForm({ basePrice: loc?.hourlyRate ?? 50, freeHours: 2, overtimeRate: 15 });
+      setPricingForm({ basePrice: Number(loc?.hourlyRate) || 50, freeHours: 2, overtimeRate: 15 });
     }
   }, [selectedLocationId, locations]);
 

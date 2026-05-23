@@ -1058,32 +1058,32 @@ function BookParkingContent() {
                 }
                 
                 /* Override Header for Print */
-                #epass-card .bg-\[\#1e3d5a\] {
+                #epass-card .bg-\\[\\#1e3d5a\\] {
                   background: #ffffff !important;
                   background-color: #ffffff !important;
                   color: #1e3d5a !important;
                   padding-top: 24px !important;
                   padding-bottom: 20px !important;
                 }
-                #epass-card .text-\[\#90b4d8\] {
+                #epass-card .text-\\[\\#90b4d8\\] {
                   color: #4a5568 !important;
                   font-weight: 800 !important;
                 }
-                #epass-card h3.text-\[\#ee6b20\] {
+                #epass-card h3.text-\\[\\#ee6b20\\] {
                   color: #ee6b20 !important;
                   font-weight: 900 !important;
                 }
-                #epass-card .text-white\/70 {
+                #epass-card .text-white\\/70 {
                   color: #718096 !important;
                   font-weight: 600 !important;
                 }
-                #epass-card .text-white\/70 svg {
+                #epass-card .text-white\\/70 svg {
                   display: none !important; /* Hide MapPin icon for clean layout */
                 }
                 #epass-card .opacity-80 {
                   opacity: 1 !important;
                 }
-                #epass-card .bg-white\/5 {
+                #epass-card .bg-white\\/5 {
                   display: none !important;
                 }
                 
@@ -1094,10 +1094,10 @@ function BookParkingContent() {
                 }
                 
                 /* Detail values */
-                #epass-card .text-\[\#1e3d5a\] {
+                #epass-card .text-\\[\\#1e3d5a\\] {
                   color: #1e3d5a !important;
                 }
-                #epass-card .text-\[\#ee6b20\] {
+                #epass-card .text-\\[\\#ee6b20\\] {
                   color: #ee6b20 !important;
                 }
                 

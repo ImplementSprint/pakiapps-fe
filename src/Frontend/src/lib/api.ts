@@ -7,8 +7,10 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5
 
 interface ApiResponse<T = any> {
   success: boolean;
-  data?: T;
   message?: string;
+  data?: T;
+  error?: string;
+  recommendedPollMs?: number;
 }
 
 class ApiClient {
