@@ -1,0 +1,45 @@
+# Build outputs
+node_modules/
+dist/
+.next/
+build/
+out/
+
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Editor directories and files
+.idea
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+
+# Testing and coverage
+coverage/
+.nyc_output
+
+# Temporary Files
+/tmp/
+/temp/
+
+# Agent and Tool-Specific
+.agents/
+.augment/
+.gemini/
+.antigravity/
+.antigravityignore
+PakiPark.code-workspace
+skills-lock.json
