@@ -85,6 +85,34 @@ export default function OperationalFeaturePage({ feature }: OperationalFeaturePa
   const [revenueTrend, setRevenueTrend] = useState<any[]>([]);
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(true);
 
+  // Tariff & Policy Configurator state
+  const [baseRate, setBaseRate] = useState(50);
+  const [isSurgeEnabled, setIsSurgeEnabled] = useState(true);
+  const [surgeThreshold, setSurgeThreshold] = useState(85);
+  const [surgeMultiplier, setSurgeMultiplier] = useState(1.5);
+  const [isEscrowEnabled, setIsEscrowEnabled] = useState(true);
+  const [gracePeriod, setGracePeriod] = useState(30);
+  const [forfeitureFee, setForfeitureFee] = useState(50);
+
+  // Simulator state
+  const [simulatedOccupancy, setSimulatedOccupancy] = useState(80);
+
+  // Derived simulator values
+  const currentMultiplier = React.useMemo(() => {
+    if (!isSurgeEnabled) return 1.0;
+    return simulatedOccupancy >= surgeThreshold ? surgeMultiplier : 1.0;
+  }, [isSurgeEnabled, simulatedOccupancy, surgeThreshold, surgeMultiplier]);
+
+  const currentRate = React.useMemo(() => {
+    return baseRate * currentMultiplier;
+  }, [baseRate, currentMultiplier]);
+
+  const simulatedSeverity = React.useMemo(() => {
+    if (simulatedOccupancy >= 85) return 'CRITICAL';
+    if (simulatedOccupancy >= 70) return 'WARNING';
+    return 'STABLE';
+  }, [simulatedOccupancy]);
+
   // Derived stats for analytics feature
   const avgOccupancy = analyticsRows.length ? analyticsRows[0].avg_network_occupancy_pct ?? 0 : 0;
   const totalRevenue = analyticsRows.reduce((s, r) => s + Number(r.revenue_today), 0);
@@ -285,215 +313,213 @@ export default function OperationalFeaturePage({ feature }: OperationalFeaturePa
           </section>
 
           {feature === 'analytics' ? (
-            /* ANALYTICS SECTION */
-            isLoadingAnalytics ? (
-              <div className="grid grid-cols-3 gap-6">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="h-36 bg-white rounded-[2rem] border border-[#1e3d5a]/5 animate-pulse" />
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-8">
-                {/* Top Row - Northstar Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <Card className="bg-white rounded-[2rem] border-none shadow-sm overflow-hidden">
-                    <CardContent className="p-7">
-                      <p className="text-[10px] font-black text-[#1e3d5a]/40 uppercase tracking-widest mb-3">Slot Occupancy Rate</p>
-                      <p className={`text-4xl font-black tracking-tight ${avgOccupancy >= 90 ? 'text-red-500' : avgOccupancy >= TARGET_OCCUPANCY ? 'text-emerald-500' : 'text-[#ee6b20]'}`}>{avgOccupancy.toFixed(1)}%</p>
-                      <p className="text-xs font-medium text-[#1e3d5a]/50 mt-1">Network average across {analyticsRows.length} locations</p>
-                      <div className="mt-4">
-                        <div className="flex justify-between text-[10px] font-bold text-[#1e3d5a]/40 mb-1">
-                          <span>0%</span><span className="text-[#ee6b20]">Target {TARGET_OCCUPANCY}%</span><span>100%</span>
+            /* TARIFF & POLICY CONFIGURATOR REDESIGN */
+            <div className="space-y-8 animate-in fade-in duration-300">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Left Panel: Tariff Settings */}
+                <Card className="bg-white rounded-[2.5rem] border-none shadow-sm p-8 space-y-8">
+                  <div>
+                    <h3 className="text-xl font-bold text-[#1e3d5a] flex items-center gap-2">
+                      <DollarSign className="w-5 h-5 text-[#ee6b20]" /> Dynamic Tariff Rules
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-1">Configure base rate tariffs and trigger parameters for occupancy-based surges.</p>
+                  </div>
+
+                  <div className="space-y-6">
+                    {/* Base Rate Slider */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center text-sm font-bold">
+                        <label className="text-[#1e3d5a]">Base Hourly Rate</label>
+                        <span className="text-[#ee6b20] font-black">₱{baseRate} / hr</span>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="30" 
+                        max="150" 
+                        step="5"
+                        value={baseRate}
+                        onChange={(e) => setBaseRate(Number(e.target.value))}
+                        className="w-full accent-[#ee6b20] bg-gray-100 h-2 rounded-lg cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Dynamic Surge Switch */}
+                    <div className="flex items-center justify-between p-4 bg-[#f4f7fa] rounded-2xl">
+                      <div>
+                        <p className="text-sm font-bold text-[#1e3d5a]">Dynamic Occupancy Surcharges</p>
+                        <p className="text-[10px] text-gray-400 font-medium">Auto-scale pricing during peak demand spikes</p>
+                      </div>
+                      <button 
+                        onClick={() => setIsSurgeEnabled(!isSurgeEnabled)}
+                        className={`w-12 h-6 rounded-full transition-colors relative flex items-center ${isSurgeEnabled ? 'bg-[#ee6b20]' : 'bg-gray-200'}`}
+                      >
+                        <span className={`w-4 h-4 rounded-full bg-white absolute transition-transform ${isSurgeEnabled ? 'translate-x-7' : 'translate-x-1'}`} />
+                      </button>
+                    </div>
+
+                    {isSurgeEnabled && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 border border-[#f4f7fa] rounded-3xl animate-in slide-in-from-top-2 duration-300">
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs font-bold">
+                            <span className="text-gray-400">Trigger Threshold</span>
+                            <span className="text-[#1e3d5a]">{surgeThreshold}% occupancy</span>
+                          </div>
+                          <input 
+                            type="range" 
+                            min="60" 
+                            max="95" 
+                            value={surgeThreshold}
+                            onChange={(e) => setSurgeThreshold(Number(e.target.value))}
+                            className="w-full accent-[#ee6b20]"
+                          />
                         </div>
-                        <div className="relative h-2 rounded-full bg-[#f4f7fa] overflow-hidden">
-                          <div className="absolute left-0 top-0 h-full rounded-full transition-all duration-700" style={{ width: `${Math.min(avgOccupancy, 100)}%`, background: avgOccupancy >= 90 ? '#ef4444' : avgOccupancy >= TARGET_OCCUPANCY ? '#10b981' : '#ee6b20' }} />
-                          <div className="absolute top-0 h-full w-0.5 bg-[#1e3d5a]/30" style={{ left: `${TARGET_OCCUPANCY}%` }} />
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs font-bold">
+                            <span className="text-gray-400">Surge Multiplier</span>
+                            <span className="text-[#ee6b20]">{surgeMultiplier}×</span>
+                          </div>
+                          <input 
+                            type="range" 
+                            min="1.1" 
+                            max="2.5" 
+                            step="0.1"
+                            value={surgeMultiplier}
+                            onChange={(e) => setSurgeMultiplier(Number(e.target.value))}
+                            className="w-full accent-[#ee6b20]"
+                          />
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                    )}
+                  </div>
+                </Card>
 
-                  <Card className="bg-white rounded-[2rem] border-none shadow-sm overflow-hidden">
-                    <CardContent className="p-7">
-                      <p className="text-[10px] font-black text-[#1e3d5a]/40 uppercase tracking-widest mb-3">Real-Time Bypass Alert</p>
-                      <p className={`text-4xl font-black tracking-tight ${criticalLoc?.severity === 'CRITICAL' ? 'text-red-500' : criticalLoc?.severity === 'WARNING' ? 'text-amber-500' : 'text-emerald-500'}`}>{criticalLoc ? `${criticalLoc.forecast_capacity_pct.toFixed(0)}%` : 'No Alert'}</p>
-                      <p className="text-xs font-medium text-[#1e3d5a]/50 mt-1">{criticalLoc ? `${criticalLoc.location_name} — 4h Deadlock Forecast` : 'All locations within safe range'}</p>
-                    </CardContent>
-                  </Card>
+                {/* Right Panel: Escrow Settings */}
+                <Card className="bg-white rounded-[2.5rem] border-none shadow-sm p-8 space-y-8">
+                  <div>
+                    <h3 className="text-xl font-bold text-[#1e3d5a] flex items-center gap-2">
+                      <ShieldCheck className="w-5 h-5 text-emerald-600" /> Escrow & Violation Rules
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-1">Configure penalty rates and enforcement parameters for booking violations.</p>
+                  </div>
 
-                  <Card className="bg-white rounded-[2rem] border-none shadow-sm overflow-hidden">
-                    <CardContent className="p-7">
-                      <p className="text-[10px] font-black text-[#1e3d5a]/40 uppercase tracking-widest mb-3">Enforcement Queue</p>
-                      <p className={`text-4xl font-black tracking-tight ${totalOverstays > 0 ? 'text-red-500' : 'text-emerald-500'}`}>{totalOverstays}</p>
-                      <p className="text-xs font-medium text-[#1e3d5a]/50 mt-1">{totalOverstays > 0 ? `${totalOverstays} vehicle(s) violating time limits` : 'No active overstay violations'}</p>
-                    </CardContent>
-                  </Card>
-                </div>
+                  <div className="space-y-6">
+                    {/* Escrow Toggle */}
+                    <div className="flex items-center justify-between p-4 bg-[#f4f7fa] rounded-2xl">
+                      <div>
+                        <p className="text-sm font-bold text-[#1e3d5a]">Escrow Forfeiture Policy</p>
+                        <p className="text-[10px] text-gray-400 font-medium">Forfeit reservation deposits on overstays or no-shows</p>
+                      </div>
+                      <button 
+                        onClick={() => setIsEscrowEnabled(!isEscrowEnabled)}
+                        className={`w-12 h-6 rounded-full transition-colors relative flex items-center ${isEscrowEnabled ? 'bg-emerald-600' : 'bg-gray-200'}`}
+                      >
+                        <span className={`w-4 h-4 rounded-full bg-white absolute transition-transform ${isEscrowEnabled ? 'translate-x-7' : 'translate-x-1'}`} />
+                      </button>
+                    </div>
 
-                {/* Supporting Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {[
-                    { label: 'Total Revenue Today', value: `₱${totalRevenue.toLocaleString()}`, icon: DollarSign, color: '#10b981' },
-                    { label: 'Active Vehicles', value: String(analyticsRows.reduce((s, r) => s + Number(r.active_cars), 0)), icon: Car, color: '#ee6b20' },
-                    { label: 'Incoming (Next 4h)', value: String(analyticsRows.reduce((s, r) => s + Number(r.incoming_4h), 0)), icon: TrendingUp, color: '#8b5cf6' },
-                    { label: 'Active Locations', value: String(analyticsRows.length), icon: MapPin, color: '#1e3d5a' },
-                  ].map(s => (
-                    <Card key={s.label} className="bg-white rounded-[1.75rem] border-none shadow-sm">
-                      <CardContent className="p-5 flex items-center gap-4">
-                        <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${s.color}18` }}>
-                          <s.icon size={20} style={{ color: s.color }} />
+                    {isEscrowEnabled && (
+                      <div className="space-y-6 p-6 border border-[#f4f7fa] rounded-3xl animate-in slide-in-from-top-2 duration-300">
+                        {/* Grace Period */}
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs font-bold">
+                            <span className="text-gray-400">Violation Grace Period</span>
+                            <span className="text-emerald-600">{gracePeriod} minutes</span>
+                          </div>
+                          <input 
+                            type="range" 
+                            min="5" 
+                            max="60" 
+                            step="5"
+                            value={gracePeriod}
+                            onChange={(e) => setGracePeriod(Number(e.target.value))}
+                            className="w-full accent-emerald-600"
+                          />
                         </div>
-                        <div>
-                          <p className="text-2xl font-black text-[#1e3d5a]">{s.value}</p>
-                          <p className="text-[10px] font-bold text-[#1e3d5a]/40 uppercase tracking-wider">{s.label}</p>
+
+                        {/* Penalty Fee */}
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs font-bold">
+                            <span className="text-gray-400">Forfeiture Penalty Fee</span>
+                            <span className="text-emerald-600">{forfeitureFee}% of deposit</span>
+                          </div>
+                          <input 
+                            type="range" 
+                            min="10" 
+                            max="100" 
+                            step="5"
+                            value={forfeitureFee}
+                            onChange={(e) => setForfeitureFee(Number(e.target.value))}
+                            className="w-full accent-emerald-600"
+                          />
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              </div>
+
+              {/* Bottom Section: Interactive Policy Simulator */}
+              <Card className="bg-white rounded-[2.5rem] border-none shadow-sm p-8 space-y-6">
+                <div>
+                  <h3 className="text-xl font-bold text-[#1e3d5a] flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-purple-600" /> Interactive Policy Simulator
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-1">Simulate parking occupancy load to test dynamic rate actions and enforcement alerts.</p>
                 </div>
 
-                {/* Middle Row - Charts */}
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                  {/* Descriptive Bar Chart */}
-                  <Card className="bg-white rounded-[2.5rem] border-none shadow-sm">
-                    <CardHeader className="p-8 pb-4">
-                      <CardTitle className="text-lg font-bold text-[#1e3d5a]">Occupancy vs Capacity</CardTitle>
-                      <p className="text-xs text-gray-400">Active cars per location with surge multiplier overlay</p>
-                    </CardHeader>
-                    <CardContent className="px-4 pb-6">
-                      {barData.length === 0 ? (
-                        <div className="h-52 flex items-center justify-center text-[#1e3d5a]/30 font-bold text-sm">No data available</div>
-                      ) : (
-                        <ResponsiveContainer width="100%" height={220}>
-                          <ComposedChart data={barData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" />
-                            <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#8492a6', fontWeight: 700 }} />
-                            <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#8492a6' }} />
-                            <YAxis yAxisId="right" orientation="right" domain={[0, 2]} tick={{ fontSize: 10, fill: '#8492a6' }} tickFormatter={v => `${v}×`} />
-                            <Tooltip contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12 }} />
-                            <Legend wrapperStyle={{ fontSize: 11 }} />
-                            <Bar yAxisId="left" dataKey="activeCars" name="Active Cars" fill="#1e3d5a" radius={[6,6,0,0]} maxBarSize={40} />
-                            <Bar yAxisId="left" dataKey="totalSlots" name="Total Slots" fill="#e2e8f0" radius={[6,6,0,0]} maxBarSize={40} />
-                            <Line yAxisId="right" type="monotone" dataKey="surgeMultiplier" name="Surge ×" stroke="#ee6b20" strokeWidth={2.5} dot={{ r: 4, fill: '#ee6b20' }} />
-                          </ComposedChart>
-                        </ResponsiveContainer>
-                      )}
-                    </CardContent>
-                  </Card>
+                <div className="space-y-6 p-6 bg-[#f4f7fa] rounded-3xl">
+                  {/* Simulator Slider */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center text-sm font-black">
+                      <span className="text-gray-400 uppercase tracking-widest text-[10px]">Simulated Occupancy</span>
+                      <span className={`text-lg ${
+                        simulatedOccupancy >= 85 ? 'text-red-500' : simulatedOccupancy >= 70 ? 'text-amber-500' : 'text-emerald-500'
+                      }`}>{simulatedOccupancy}%</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="100" 
+                      value={simulatedOccupancy}
+                      onChange={(e) => setSimulatedOccupancy(Number(e.target.value))}
+                      className="w-full accent-purple-600 cursor-pointer h-2 bg-gray-200 rounded-lg"
+                    />
+                  </div>
 
-                  {/* Revenue Bar Chart */}
-                  <Card className="bg-white rounded-[2.5rem] border-none shadow-sm">
-                    <CardHeader className="p-8 pb-4">
-                      <CardTitle className="text-lg font-bold text-[#1e3d5a]">Revenue by Location</CardTitle>
-                      <p className="text-xs text-gray-400">Daily revenue generated across the network</p>
-                    </CardHeader>
-                    <CardContent className="px-4 pb-6">
-                      {analyticsRows.length === 0 ? (
-                        <div className="h-52 flex items-center justify-center text-[#1e3d5a]/30 font-bold text-sm">No data available</div>
-                      ) : (
-                        <ResponsiveContainer width="100%" height={220}>
-                          <BarChart data={analyticsRows.map(r => ({ name: r.location_name.replace('PakiPark ', '').replace(' Parking', '').slice(0, 14), revenue: Number(r.revenue_today) }))} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" />
-                            <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#8492a6', fontWeight: 700 }} />
-                            <YAxis tick={{ fontSize: 10, fill: '#8492a6' }} tickFormatter={v => `₱${v/1000}k`} />
-                            <Tooltip formatter={(value: number) => [`₱${value.toLocaleString()}`, 'Revenue']} contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12 }} />
-                            <Legend wrapperStyle={{ fontSize: 11 }} />
-                            <Bar dataKey="revenue" name="Daily Revenue" fill="#10b981" radius={[6,6,0,0]} maxBarSize={40} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Descriptive Analytics Row */}
-                <div className="mt-8">
-                  <h3 className="text-xl font-black text-[#1e3d5a] mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-[#ee6b20]"/> Descriptive Insights</h3>
-                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                    {/* Revenue Trend Line Chart */}
-                    <Card className="bg-white rounded-[2.5rem] border-none shadow-sm xl:col-span-2">
-                      <CardHeader className="p-8 pb-4">
-                        <CardTitle className="text-lg font-bold text-[#1e3d5a]">Historical Revenue Trend</CardTitle>
-                        <p className="text-xs text-gray-400">Monthly revenue growth (Last 5 Months)</p>
-                      </CardHeader>
-                      <CardContent className="px-4 pb-6">
-                        {revenueTrend.length === 0 ? (
-                          <div className="h-52 flex items-center justify-center text-[#1e3d5a]/30 font-bold text-sm">No data available</div>
-                        ) : (
-                          <ResponsiveContainer width="100%" height={220}>
-                            <AreaChart data={revenueTrend} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                              <defs>
-                                <linearGradient id="gRevenue" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                                </linearGradient>
-                              </defs>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
-                              <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#8492a6', fontWeight: 700 }} axisLine={false} tickLine={false} />
-                              <YAxis tick={{ fontSize: 10, fill: '#8492a6' }} tickFormatter={(v) => `₱${(v/1000)}k`} axisLine={false} tickLine={false} />
-                              <Tooltip 
-                                contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12 }} 
-                                formatter={(value: number) => [`₱${value.toLocaleString()}`, 'Revenue']}
-                              />
-                              <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={3} fill="url(#gRevenue)" activeDot={{ r: 6, fill: '#ee6b20', strokeWidth: 2, stroke: '#fff' }} />
-                            </AreaChart>
-                          </ResponsiveContainer>
-                        )}
-                      </CardContent>
-                    </Card>
-
-                    {/* Breakdown Donuts */}
-                    <div className="grid grid-rows-2 gap-6">
-                      <Card className="bg-white rounded-[2rem] border-none shadow-sm">
-                        <CardHeader className="px-6 py-4 pb-0">
-                          <CardTitle className="text-sm font-bold text-[#1e3d5a]">Vehicle Mix</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-0 h-40 relative flex items-center justify-center">
-                          {vehicleData.length === 0 ? (
-                            <span className="text-[#1e3d5a]/30 font-bold text-xs">No data</span>
-                          ) : (
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart data={vehicleData} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f4f8" />
-                                <XAxis dataKey="vehicle_type" tick={{ fontSize: 9, fill: '#8492a6', fontWeight: 700 }} axisLine={false} tickLine={false} />
-                                <YAxis tick={{ fontSize: 9, fill: '#8492a6' }} axisLine={false} tickLine={false} />
-                                <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', fontSize: 11 }} cursor={{ fill: 'rgba(30,61,90,0.05)' }} />
-                                <Bar dataKey="count" fill="#ee6b20" radius={[4,4,0,0]} maxBarSize={30}>
-                                  {vehicleData.map((e, i) => <Cell key={`cell-${i}`} fill={['#ee6b20', '#1e3d5a', '#10b981', '#8b5cf6'][i % 4]} />)}
-                                </Bar>
-                              </BarChart>
-                            </ResponsiveContainer>
-                          )}
-                        </CardContent>
-                      </Card>
-
-                      <Card className="bg-white rounded-[2rem] border-none shadow-sm">
-                        <CardHeader className="px-6 py-4 pb-0">
-                          <CardTitle className="text-sm font-bold text-[#1e3d5a]">Payment Preferences</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-0 h-40 relative flex items-center justify-center">
-                          {paymentData.length === 0 ? (
-                            <span className="text-[#1e3d5a]/30 font-bold text-xs">No data</span>
-                          ) : (
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart data={paymentData} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f4f8" />
-                                <XAxis dataKey="payment_method" tick={{ fontSize: 9, fill: '#8492a6', fontWeight: 700 }} axisLine={false} tickLine={false} />
-                                <YAxis tick={{ fontSize: 9, fill: '#8492a6' }} axisLine={false} tickLine={false} />
-                                <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', fontSize: 11 }} cursor={{ fill: 'rgba(16,185,129,0.05)' }} />
-                                <Bar dataKey="count" fill="#10b981" radius={[4,4,0,0]} maxBarSize={30}>
-                                  {paymentData.map((e, i) => <Cell key={`cell-${i}`} fill={['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6'][i % 4]} />)}
-                                </Bar>
-                              </BarChart>
-                            </ResponsiveContainer>
-                          )}
-                        </CardContent>
-                      </Card>
+                  {/* Simulator Results Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-[#1e3d5a]/5">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Surge Multiplier</p>
+                      <p className="text-lg font-black text-[#1e3d5a] mt-1">{currentMultiplier.toFixed(1)}×</p>
+                    </div>
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-[#1e3d5a]/5">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Hourly Tariff</p>
+                      <p className="text-lg font-black text-[#ee6b20] mt-1">₱{currentRate.toFixed(0)} / hr</p>
+                    </div>
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-[#1e3d5a]/5">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Alert Level</p>
+                      <span className={`inline-block mt-2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                        simulatedSeverity === 'CRITICAL' ? 'bg-red-50 text-red-600 border border-red-100' :
+                        simulatedSeverity === 'WARNING' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                        'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                      }`}>
+                        {simulatedSeverity}
+                      </span>
+                    </div>
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-[#1e3d5a]/5">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Enforcement Engine</p>
+                      <p className={`text-xs font-bold mt-1.5 ${
+                        simulatedOccupancy >= 85 ? 'text-red-500' : simulatedOccupancy >= 70 ? 'text-amber-500' : 'text-emerald-500'
+                      }`}>
+                        {simulatedOccupancy >= 85 ? 'Trigger Surge Surcharges' : 
+                         simulatedOccupancy >= 70 ? 'Escrow Forfeiture Armed' : 
+                         'No Surcharges Active'}
+                      </p>
                     </div>
                   </div>
                 </div>
-              </div>
-            )
+              </Card>
+            </div>
           ) : (
             /* STANDARD FLOW */
             <>

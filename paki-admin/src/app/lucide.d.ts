@@ -122,6 +122,7 @@ declare module 'lucide-react' {
   export const Workflow: LucideIcon;
   export const UserCog: LucideIcon;
   export const Loader2: LucideIcon;
+  export const Wrench: LucideIcon;
   export const History: LucideIcon;
   export const CalendarCheck: LucideIcon;
   export const Zap: LucideIcon;

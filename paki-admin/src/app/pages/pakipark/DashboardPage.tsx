@@ -333,7 +333,7 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
-                    <ComposedChart data={barData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                    <ComposedChart data={barData} margin={{ top: 5, right: 20, left: 15, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" />
                       <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#8492a6', fontWeight: 700 }} />
                       <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#8492a6' }} />
@@ -389,7 +389,7 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={revenueData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                    <BarChart data={revenueData} margin={{ top: 5, right: 20, left: 15, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" />
                       <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#8492a6', fontWeight: 700 }} />
                       <YAxis
@@ -433,7 +433,7 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
-                  <AreaChart data={forecastData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                  <AreaChart data={forecastData} margin={{ top: 5, right: 20, left: 15, bottom: 5 }}>
                     <defs>
                       <linearGradient id="gCurrent" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#1e3d5a" stopOpacity={0.2} />

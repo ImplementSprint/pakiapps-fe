@@ -69,7 +69,7 @@ export default function HubUtilizationChart({ data, isLoading }: HubUtilizationC
       ) : (
         <div className="relative">
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
+            <BarChart data={chartData} margin={{ top: 10, right: 10, left: 15, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#39B5A810" vertical={false} />
               <XAxis
                 dataKey="hub"

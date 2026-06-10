@@ -422,7 +422,7 @@ export async function fetchAnalyticsStats(range: 'Today' | 'Last 7 Days' | 'Last
     const driversRows = rawData.drivers || [];
 
     const items = allItems.filter((i: any) => i.created_at >= priorSinceISO);
-    const draftMap = new Map(drafts.map((d: any) => [d.id, d]));
+    const draftMap = new Map<string, any>(drafts.map((d: any) => [d.id, d]));
 
     const curItems = items.filter((item: any) => item.created_at >= currentISO);
     const prevItems = items.filter((item: any) => item.created_at >= priorSinceISO && item.created_at < priorUntilISO);
@@ -431,7 +431,7 @@ export async function fetchAnalyticsStats(range: 'Today' | 'Last 7 Days' | 'Last
     const volumeMap: Record<string, { volume: number; revenue: number }> = {};
     const seenDraftsCur = new Set<string>();
 
-    curItems.forEach(item => {
+    curItems.forEach((item: any) => {
       if (seenDraftsCur.has(item.parcel_draft_id)) return;
       seenDraftsCur.add(item.parcel_draft_id);
 
@@ -470,7 +470,7 @@ export async function fetchAnalyticsStats(range: 'Today' | 'Last 7 Days' | 'Last
     let prevRevenue = 0, prevDelivered = 0, prevPending = 0, prevCancelled = 0, prevLost = 0;
     const seenDraftsPrev = new Set<string>();
 
-    prevItems.forEach(item => {
+    prevItems.forEach((item: any) => {
       if (seenDraftsPrev.has(item.parcel_draft_id)) return;
       seenDraftsPrev.add(item.parcel_draft_id);
 

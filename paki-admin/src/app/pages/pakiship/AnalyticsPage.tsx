@@ -599,7 +599,7 @@ export default function AnalyticsPage() {
                 {hasVolumeData ? (
                   <ResponsiveContainer width="100%" height={210}>
                     {volumeType === 'Bar' ? (
-                      <BarChart data={volumeChartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                      <BarChart data={volumeChartData} margin={{ top: 4, right: 4, left: 15, bottom: 0 }}>
                         <defs>
                           <linearGradient id="barGradVol" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="0%" stopColor={TEAL_LIGHT} />
@@ -623,7 +623,7 @@ export default function AnalyticsPage() {
                         <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={52} fill="url(#barGradVol)" />
                       </BarChart>
                     ) : (
-                      <LineChart data={volumeChartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                      <LineChart data={volumeChartData} margin={{ top: 4, right: 4, left: 15, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke={TEAL} strokeOpacity={0.07} />
                         <XAxis
                           dataKey="label"
@@ -669,7 +669,7 @@ export default function AnalyticsPage() {
                 />
                 {hasRevenueData ? (
                   <ResponsiveContainer width="100%" height={210}>
-                    <BarChart data={revenueChartData} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
+                    <BarChart data={revenueChartData} margin={{ top: 4, right: 4, left: 15, bottom: 0 }}>
                       <defs>
                         <linearGradient id="revenueBarGrad" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor={TEAL_LIGHT} />

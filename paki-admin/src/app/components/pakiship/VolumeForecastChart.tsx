@@ -58,7 +58,7 @@ export default function VolumeForecastChart({ data, isLoading }: BypassForecastC
       ) : (
         <div className="relative">
           <ResponsiveContainer width="100%" height={280}>
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
+            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 15, bottom: 5 }}>
               <defs>
                 {/* 4h forecast — amber fill */}
                 <linearGradient id="gradient4h" x1="0" y1="0" x2="0" y2="1">
