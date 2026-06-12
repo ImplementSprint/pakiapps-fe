@@ -58,7 +58,7 @@ class ApiClient {
       return data;
     } catch (error: any) {
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        throw new Error('Cannot reach the PakiPark API server. Make sure the backend is running: cd src/Backend && npm run dev');
+        throw new Error('Cannot reach the PakiPark API server. Check NEXT_PUBLIC_API_BASE_URL and confirm the API service is running.');
       }
       throw error;
     }

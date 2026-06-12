@@ -8,6 +8,8 @@ const createJestConfig = nextJest({
 const config = {
   testEnvironment: 'jsdom',
   testMatch: ['**/tests/unit/**/*.test.{ts,tsx,js,jsx}'],
+  testPathIgnorePatterns: ['/node_modules/', '/.next/'],
+  modulePathIgnorePatterns: ['<rootDir>/.next/'],
   moduleNameMapper: {
     // Mock next/font
     '^next/font/(.*)$': '<rootDir>/__mocks__/nextFontMock.js',

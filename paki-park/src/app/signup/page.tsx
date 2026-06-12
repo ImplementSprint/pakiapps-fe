@@ -51,7 +51,6 @@ export default function SignUpPage() {
     }, 600);
 
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identifier]);
 
   const validatePassword = (pwd: string) => {
