@@ -19,7 +19,7 @@ export default [
   js.configs.recommended,
 
   {
-    files: ['src/**/*.{js,jsx,ts,tsx}'],
+    files: ['**/*.{js,jsx,ts,tsx}'],
     plugins: {
       react: reactPlugin,
       'react-hooks': reactHooksPlugin,
@@ -55,6 +55,8 @@ export default [
     languageOptions: {
       globals: {
         ...globals.jest,
+        ...globals.browser,
+        ...globals.es2021,
       },
     },
   },
@@ -79,11 +81,14 @@ export default [
   },
 
   {
-    files: ['jest.config.js', 'jest.setup.js'],
+    files: ['jest.config.js', 'jest.setup.js', '__mocks__/**/*.js'],
     languageOptions: {
       globals: {
         ...globals.node,
       },
+    },
+    rules: {
+      'react/prop-types': 'off',
     },
   },
 ];
