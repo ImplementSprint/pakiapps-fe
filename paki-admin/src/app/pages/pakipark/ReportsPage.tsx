@@ -148,7 +148,7 @@ export default function ReportsPage() {
   const handleExport = () => {
     const headers = ["Period", "Revenue (PHP)"];
     const rows = activeData.chartData.map((d: any) => [d.label, d.revenue]);
-    let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + rows.map((e: any) => e.join(",")).join("\n");
+    const csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + rows.map((e: any) => e.join(",")).join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);

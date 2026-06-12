@@ -1,25 +1,92 @@
-import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTs from "eslint-config-next/typescript";
+import js from '@eslint/js';
+import globals from 'globals';
+import reactPlugin from 'eslint-plugin-react';
+import reactHooksPlugin from 'eslint-plugin-react-hooks';
+import tsParser from '@typescript-eslint/parser';
 
-const eslintConfig = defineConfig([
-  ...nextVitals,
-  ...nextTs,
-  // Override default ignores of eslint-config-next.
-  globalIgnores([
-    // Default ignores of eslint-config-next:
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts",
-  ]),
-  // Jest config files must use CommonJS require() — disable the rule for them.
+export default [
   {
-    files: ["jest.config.js", "jest.setup.js"],
+    ignores: [
+      '.next/',
+      'dist/',
+      'build/',
+      'out/',
+      'coverage/',
+      'node_modules/',
+      'src/Frontend/.next/',
+      'src/Frontend/node_modules/',
+      'src/Backend/node_modules/',
+    ],
+  },
+
+  js.configs.recommended,
+
+  {
+    files: ['src/**/*.{js,jsx,ts,tsx}'],
+    plugins: {
+      react: reactPlugin,
+      'react-hooks': reactHooksPlugin,
+    },
+    languageOptions: {
+      parser: tsParser,
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        ...globals.browser,
+        ...globals.es2021,
+      },
+      parserOptions: {
+        ecmaFeatures: { jsx: true },
+      },
+    },
+    settings: {
+      react: { version: 'detect' },
+    },
     rules: {
-      "@typescript-eslint/no-require-imports": "off",
+      'react/react-in-jsx-scope': 'off',
+      'react/jsx-uses-react': 'error',
+      'react/jsx-uses-vars': 'error',
+      'react/prop-types': 'warn',
+      'no-unused-vars': 'warn',
+      'no-console': 'warn',
+      'no-undef': 'off',
     },
   },
-]);
 
-export default eslintConfig;
+  {
+    files: ['tests/**/*.{js,jsx,ts,tsx}'],
+    languageOptions: {
+      globals: {
+        ...globals.jest,
+      },
+    },
+  },
+
+  {
+    files: ['tests/e2e/**/*.{js,jsx,ts,tsx}'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+    rules: {
+      'no-console': 'off',
+    },
+  },
+
+  {
+    files: ['**/*.d.ts'],
+    rules: {
+      'no-unused-vars': 'off',
+    },
+  },
+
+  {
+    files: ['jest.config.js', 'jest.setup.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
+];

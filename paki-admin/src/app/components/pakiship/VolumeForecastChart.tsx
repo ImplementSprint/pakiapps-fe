@@ -94,10 +94,12 @@ export default function VolumeForecastChart({ data, isLoading }: BypassForecastC
                   fontSize: 12,
                   fontWeight: 600,
                 }}
-                formatter={(value: number, name: string) => {
-                  if (name === 'forecast_4h_pct') return [`${value.toFixed(1)}%`, '4h Forecast'];
-                  if (name === 'forecast_24h_pct') return [`${value.toFixed(1)}%`, '24h Forecast'];
-                  return [value, name];
+                formatter={(value: unknown, name: unknown) => {
+                  const numericValue = Number(value ?? 0);
+                  const seriesName = String(name);
+                  if (seriesName === 'forecast_4h_pct') return [`${numericValue.toFixed(1)}%`, '4h Forecast'];
+                  if (seriesName === 'forecast_24h_pct') return [`${numericValue.toFixed(1)}%`, '24h Forecast'];
+                  return [numericValue, seriesName];
                 }}
               />
               {/* 75% Target — solid green */}

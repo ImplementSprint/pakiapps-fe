@@ -397,7 +397,7 @@ export default function DashboardPage() {
                         tickFormatter={v => `₱${v / 1000}k`}
                       />
                       <Tooltip
-                        formatter={(value: number) => [`₱${value.toLocaleString()}`, 'Revenue']}
+                        formatter={(value: unknown) => [`₱${Number(value ?? 0).toLocaleString()}`, 'Revenue']}
                         contentStyle={{
                           borderRadius: 12,
                           border: 'none',
