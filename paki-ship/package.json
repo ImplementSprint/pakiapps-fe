@@ -73,7 +73,7 @@
   },
   "overrides": {
     "postcss": "^8.5.15",
-    "ws": "^8.20.1"
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
