@@ -1,6 +1,10 @@
-node_modules
 .next
-coverage
+node_modules
+npm-debug.log
+Dockerfile
+.dockerignore
 .git
-.github
-npm-debug.log*
+.gitignore
+.env
+.env.*
+coverage

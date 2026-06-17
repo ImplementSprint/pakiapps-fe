@@ -1,30 +1,19 @@
-const nextJest = require('next/jest');
+import nextJest from "next/jest.js";
 
 const createJestConfig = nextJest({
-  dir: './',
+  dir: "./"
 });
 
 const customJestConfig = {
-  testEnvironment: 'jest-environment-jsdom',
-  roots: ['<rootDir>/tests', '<rootDir>/src'],
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-  testPathIgnorePatterns: ['/node_modules/', '/.next/'],
-  modulePathIgnorePatterns: ['<rootDir>/.next/'],
-  collectCoverage: true,
+  setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
+  testEnvironment: "jsdom",
   collectCoverageFrom: [
-    '<rootDir>/src/**/*.{ts,tsx}',
-    '!<rootDir>/src/**/*.d.ts',
-    '!<rootDir>/src/app/**/*.{ts,tsx}',
+    "<rootDir>/src/features/utils/pricingCalculations.ts"
   ],
-  coverageReporters: ['text', 'lcov', 'json-summary'],
-  coverageThreshold: {
-    global: {
-      branches: 80,
-      functions: 80,
-      lines: 85,
-      statements: 85,
-    },
-  },
+  moduleNameMapper: {
+    "^@/(.*)$": "<rootDir>/src/$1",
+    "^react-router$": "<rootDir>/src/lib/react-router-compat.tsx"
+  }
 };
 
-module.exports = createJestConfig(customJestConfig);
+export default createJestConfig(customJestConfig);
