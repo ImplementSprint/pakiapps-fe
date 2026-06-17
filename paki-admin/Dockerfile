@@ -1,5 +1,7 @@
 FROM node:24-alpine AS base
 WORKDIR /app
+ENV NPM_CONFIG_AUDIT=false \
+	NPM_CONFIG_FUND=false
 RUN apk upgrade --no-cache
 
 FROM base AS deps
