@@ -10,12 +10,7 @@ import {
   CheckCircle2,
   XCircle,
   Eye,
-  Search,
-  ChevronDown,
   X,
-  User,
-  Settings,
-  LogOut,
   AlertCircle,
   Clock,
   ShieldCheck,
@@ -23,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
+import { PakiParkSearchHeader, StatCard } from '../../components/pakipark/pakiparkUi';
 
 interface VehicleDoc {
   id: string;
@@ -52,7 +48,6 @@ export default function DocumentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<DocFilter>('all');
   const [search, setSearch] = useState('');
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleDoc | null>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -267,36 +262,14 @@ export default function DocumentsPage() {
       )}
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-[#1e3d5a]/10 px-10 flex items-center justify-between sticky top-0 z-30">
-          <div className="flex items-center gap-4 bg-[#f4f7fa] px-4 py-2 rounded-xl border border-[#1e3d5a]/10 w-80">
-            <Search className="w-4 h-4 text-[#1e3d5a]/60" />
-            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search plate, owner, brand..." className="bg-transparent border-none outline-none text-sm w-full placeholder:text-[#1e3d5a]/40 font-medium text-[#1e3d5a]" />
-          </div>
-          <div className="flex items-center gap-4">
-            {successMsg && (
-              <div className="flex items-center gap-2 bg-emerald-50 text-emerald-600 px-4 py-2 rounded-xl border border-emerald-100 animate-in fade-in">
-                <CheckCircle2 className="w-4 h-4" /><span className="text-sm font-bold">{successMsg}</span>
-              </div>
-            )}
-            <div className="relative">
-              <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex items-center gap-3 hover:bg-[#f4f7fa] px-3 py-2 rounded-xl transition-all">
-                <div className="w-10 h-10 bg-gradient-to-br from-[#1e3d5a] to-[#2a5373] rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
-                  {displayName.charAt(0).toUpperCase()}
-                </div>
-                <span className="text-sm font-bold text-[#1e3d5a] hidden md:block">{displayName}</span>
-                <ChevronDown className={`w-4 h-4 text-[#1e3d5a] transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {isUserMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-[#1e3d5a]/10 overflow-hidden z-50">
-                  <button onClick={() => { setIsUserMenuOpen(false); navigate('/pakipark/profile'); }} className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#f4f7fa] text-left"><User className="w-4 h-4 text-[#ee6b20]" /><span className="font-semibold text-[#1e3d5a]">Profile</span></button>
-                  <button onClick={() => { setIsUserMenuOpen(false); navigate('/pakipark/settings'); }} className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#f4f7fa] text-left"><Settings className="w-4 h-4 text-[#ee6b20]" /><span className="font-semibold text-[#1e3d5a]">Settings</span></button>
-                  <div className="border-t border-[#1e3d5a]/10" />
-                  <button onClick={() => { logout(); navigate('/'); }} className="w-full flex items-center gap-3 px-5 py-3 hover:bg-red-50 text-left"><LogOut className="w-4 h-4 text-red-500" /><span className="font-semibold text-red-500">Logout</span></button>
-                </div>
-              )}
-            </div>
-          </div>
-        </header>
+        <PakiParkSearchHeader
+          searchValue={search}
+          onSearchChange={setSearch}
+          placeholder="Search plate, owner, brand..."
+          successMsg={successMsg}
+          displayName={displayName}
+          onLogout={() => { logout(); navigate('/'); }}
+        />
 
         <main className="flex-1 overflow-y-auto p-10 space-y-8 custom-scrollbar">
           <div className="flex items-center justify-between">
@@ -320,17 +293,7 @@ export default function DocumentsPage() {
               { label: 'Pending Review', value: vehicles.filter(v => !v.is_verified).length, icon: Clock, color: '#f59e0b' },
               { label: 'Verified', value: vehicles.filter(v => v.is_verified).length, icon: ShieldCheck, color: '#10b981' },
             ].map(stat => (
-              <Card key={stat.label} className="bg-white rounded-[2rem] border-none shadow-sm">
-                <CardContent className="p-6 flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${stat.color}15` }}>
-                    <stat.icon size={22} style={{ color: stat.color }} />
-                  </div>
-                  <div>
-                    <p className="text-3xl font-black text-[#1e3d5a]">{stat.value}</p>
-                    <p className="text-xs font-bold text-[#1e3d5a]/50 uppercase tracking-wider">{stat.label}</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <StatCard key={stat.label} label={stat.label} value={stat.value} icon={stat.icon} color={stat.color} />
             ))}
           </div>
 

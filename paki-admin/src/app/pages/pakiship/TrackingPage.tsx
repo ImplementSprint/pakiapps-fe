@@ -10,20 +10,16 @@ import {
   Bell,
   Search,
   HelpCircle,
-  User,
-  ChevronDown,
-  Settings,
-  LogOut,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { useAuth } from '../../contexts/AuthContext';
 import PakiShipSidebar from '../../components/pakiship/PakiShipSidebar';
+import { PakiShipUserMenu } from '../../components/pakiship/PakiShipUserMenu';
 import { getDisplayNameForEmail } from '../../lib/sampleAccounts';
 
 export default function TrackingPage() {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState('All');
   const [regionFilter, setRegionFilter] = useState('All');
   const [driverFilter, setDriverFilter] = useState('All Drivers');
@@ -154,57 +150,7 @@ export default function TrackingPage() {
             <div className="h-8 w-[1px] bg-[#39B5A8]/10"></div>
 
             {/* User Profile Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="flex items-center gap-3 hover:bg-[#F0F9F8] px-3 py-2 rounded-xl transition-all"
-              >
-                <div className="w-10 h-10 bg-gradient-to-br from-[#39B5A8] to-[#1A5D56] rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-[#39B5A8]/20">
-                  {placeholderName.charAt(0).toUpperCase()}
-                </div>
-                <div className="text-left hidden md:block min-w-max">
-                  <p className="text-sm font-bold text-[#041614] leading-tight whitespace-nowrap">{placeholderName}</p>
-                </div>
-                <ChevronDown className={`w-4 h-4 text-[#1A5D56] transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {/* Dropdown Menu */}
-              {isUserMenuOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-[#39B5A8]/10 overflow-hidden z-20">
-                  <button
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      navigate('/pakiship/profile');
-                    }}
-                    className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#F0F9F8] transition-colors text-left"
-                  >
-                    <User className="w-4 h-4 text-[#39B5A8]" />
-                    <span className="font-semibold text-[#041614]">Profile</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      navigate('/pakiship/settings');
-                    }}
-                    className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#F0F9F8] transition-colors text-left"
-                  >
-                    <Settings className="w-4 h-4 text-[#39B5A8]" />
-                    <span className="font-semibold text-[#041614]">Settings</span>
-                  </button>
-                  <div className="border-t border-[#39B5A8]/10"></div>
-                  <button
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      handleLogout();
-                    }}
-                    className="w-full flex items-center gap-3 px-5 py-3 hover:bg-red-50 transition-colors text-left"
-                  >
-                    <LogOut className="w-4 h-4 text-red-500" />
-                    <span className="font-semibold text-red-500">Logout</span>
-                  </button>
-                </div>
-              )}
-            </div>
+            <PakiShipUserMenu name={placeholderName} onLogout={handleLogout} />
           </div>
         </header>
 

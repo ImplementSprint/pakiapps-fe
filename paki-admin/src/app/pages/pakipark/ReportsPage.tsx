@@ -6,11 +6,7 @@ import {
   TrendingDown,
   Calendar,
   Download,
-  ChevronDown,
   Search,
-  User,
-  Settings,
-  LogOut,
   Map,
   Filter,
   Clock,
@@ -25,13 +21,13 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { useAuth } from '../../contexts/AuthContext';
 import PakiParkSidebar from '../../components/pakipark/PakiParkSidebar';
+import { PakiParkHeaderUserMenu } from '../../components/pakipark/pakiparkUi';
 
 type DateRange = 'Today' | 'Last 7 Days' | 'Last 30 Days' | 'Year to Date';
 
 export default function ReportsPage() {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange>('Year to Date');
 
   const displayName = (user?.name || 'Admin');
@@ -176,38 +172,7 @@ export default function ReportsPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-6">
-            <div className="h-8 w-[1px] bg-[#1e3d5a]/10"></div>
-            <div className="relative">
-              <button
-                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="flex items-center gap-3 hover:bg-[#f4f7fa] px-3 py-2 rounded-xl transition-all"
-              >
-                <div className="w-10 h-10 bg-gradient-to-br from-[#1e3d5a] to-[#2a5373] rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-blue-900/20">
-                  {displayName.charAt(0).toUpperCase()}
-                </div>
-                <div className="text-left hidden md:block min-w-max">
-                  <p className="text-sm font-bold text-[#1e3d5a] leading-tight whitespace-nowrap">{displayName}</p>
-                </div>
-                <ChevronDown className={`w-4 h-4 text-[#1e3d5a] transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {isUserMenuOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-[#1e3d5a]/10 overflow-hidden z-50">
-                  <button onClick={() => navigate('/pakipark/profile')} className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#f4f7fa] transition-colors text-left font-semibold">
-                    <User className="w-4 h-4 text-[#ee6b20]" /> Profile
-                  </button>
-                  <button onClick={() => navigate('/pakipark/settings')} className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#f4f7fa] transition-colors text-left font-semibold">
-                    <Settings className="w-4 h-4 text-[#ee6b20]" /> Settings
-                  </button>
-                  <div className="border-t border-[#1e3d5a]/10"></div>
-                  <button onClick={handleLogout} className="w-full flex items-center gap-3 px-5 py-3 hover:bg-red-50 transition-colors text-left font-semibold text-red-500">
-                    <LogOut className="w-4 h-4" /> Logout
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+          <PakiParkHeaderUserMenu displayName={displayName} onLogout={handleLogout} />
         </header>
 
         <main className="flex-1 overflow-y-auto p-10 space-y-8">

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from '../../lib/router';
 import {
   Settings,
   LogOut,
@@ -13,13 +12,10 @@ import {
   Lock,
   Eye,
   EyeOff,
-  UserPlus,
   ShieldAlert,
-  Edit3,
-  UserMinus,
   LockKeyhole,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
+import { Card, CardContent } from '../../components/ui/card';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/button';
 import { NotificationMenuButton } from '../../components/settings/NotificationMenuButton';
@@ -27,33 +23,14 @@ import PakiShipSidebar from '../../components/pakiship/PakiShipSidebar';
 import { NotificationPreferencesPanel } from '../../components/settings/NotificationPreferencesPanel';
 import { TwoFactorAuthPanel } from '../../components/settings/TwoFactorAuthPanel';
 import { getDisplayNameForEmail } from '../../lib/sampleAccounts';
-
-interface UserRecord {
-  email: string;
-  id: number;
-  name: string;
-  role: string;
-  status: 'Active' | 'Inactive';
-}
-
-interface EditableUser {
-  email: string;
-  name: string;
-  role: string;
-}
-
-type SettingsTab = 'team' | 'requests' | 'security';
-type RequestStatus = 'pending' | 'approved' | 'rejected';
-
-interface AdminRequestRecord {
-  email: string;
-  id: string;
-  name: string;
-  rejectedReason?: string;
-  requestDate: string;
-  requestedRole: string;
-  status: RequestStatus;
-}
+import { useAdminTeamSettings, type AdminRequestRecord, type UserRecord } from '../../components/settings/adminTeam';
+import {
+  AddEditUserModal,
+  RejectRequestModal,
+  TeamManagementCard,
+  AdminRequestsCard,
+  type SettingsTheme,
+} from '../../components/settings/AdminTeamPanels';
 
 const INITIAL_ADMIN_REQUESTS: AdminRequestRecord[] = [
   {
@@ -82,58 +59,97 @@ const INITIAL_ADMIN_REQUESTS: AdminRequestRecord[] = [
   },
 ];
 
+const theme: SettingsTheme = {
+  modalOverlay: 'bg-[#041614]/40',
+  rejectOverlay: 'bg-[#041614]/55',
+  rejectZ: 'z-[115]',
+  titleStrong: 'text-[#041614]',
+  bodyText: 'text-[#1A5D56]',
+  mutedText60: 'text-[#1A5D56]/60',
+  mutedText55: 'text-[#1A5D56]/55',
+  fieldLabel: 'text-[#1A5D56]/40',
+  fieldLabel50: 'text-[#1A5D56]/50',
+  fieldInput: 'border-[#39B5A8]/10 bg-[#F0F9F8]/30',
+  rejectTextarea: 'border-[#39B5A8]/15 bg-[#F0F9F8]/40 focus:bg-white focus:border-[#39B5A8]',
+  primaryButton: 'bg-[#39B5A8] hover:bg-[#2F9D91]',
+  cancelButton: 'border-[#39B5A8]/15 text-[#1A5D56]',
+  closeHoverPlain: 'hover:bg-[#F0F9F8]',
+  closeHoverSoft: 'hover:bg-[#F0F9F8]',
+  card: 'border-[#39B5A8]/10',
+  cardHeaderBorder: 'border-[#39B5A8]/5',
+  iconWrap: 'bg-[#F0F9F8]',
+  accentText: 'text-[#39B5A8]',
+  cardDescription: 'text-[#1A5D56]/60',
+  tableHead: 'bg-[#F0F9F8] border-[#39B5A8]/10 text-[#39B5A8]',
+  tableDivide: 'divide-[#39B5A8]/5',
+  rowHover: 'hover:bg-[#F0F9F8]/50',
+  roleBadge: 'border-[#39B5A8]/15 text-[#041614]',
+  roleBadgeSuper: 'border-[#39B5A8] text-[#39B5A8]',
+  roleBadgeDefault: 'border-[#39B5A8]/20 text-[#041614]',
+  addUserButton: 'bg-[#39B5A8] hover:bg-[#2F9D91] shadow-[#39B5A8]/20',
+  editHover: 'hover:text-[#39B5A8]',
+};
+
 export default function SettingsPage() {
-  const { logout, user } = useAuth();
-  const navigate = useNavigate();
-  const isSuperAdmin = user?.role === 'super-admin';
+  const { user } = useAuth();
+  const placeholderName = getDisplayNameForEmail(user?.email, 'Juan Dela Cruz');
 
-  // --- STATE LOGIC ---
-  const [activeTab, setActiveTab] = useState<SettingsTab>(isSuperAdmin ? 'team' : 'security');
+  const initialUsers: UserRecord[] = [
+    { id: 1, name: placeholderName, email: user?.email || 'juandelacruz@pakiadmin.ph', role: 'Super Admin', status: 'Active' },
+    { id: 2, name: 'Martha Burgos', email: 'marthaburgos@pakiadmin.ph', role: 'Full Access', status: 'Active' },
+    { id: 3, name: 'Rhea Rivera', email: 'rhearivera@pakiadmin.ph', role: 'View Only', status: 'Inactive' },
+    { id: 4, name: 'Justin Perez', email: 'justinperez@pakiadmin.ph', role: 'Limited Access', status: 'Active' },
+    { id: 5, name: 'Patricia Gonzaga', email: 'patriciagonzaga@pakiadmin.ph', role: 'View Only', status: 'Active' },
+    { id: 6, name: 'Raphael Santos', email: 'rapahaelsantos@pakiadmin.ph', role: 'Limited Access', status: 'Active' },
+  ];
+
+  const {
+    isSuperAdmin,
+    navigate,
+    activeTab,
+    setActiveTab,
+    showSuccess,
+    successMessage,
+    triggerSuccess,
+    isUserMenuOpen,
+    setIsUserMenuOpen,
+    isNotificationMenuOpen,
+    setIsNotificationMenuOpen,
+    showAddUserModal,
+    setShowAddUserModal,
+    showEditUserModal,
+    setShowEditUserModal,
+    currentUser,
+    setCurrentUser,
+    newUser,
+    setNewUser,
+    roleOptions,
+    users,
+    requestToReject,
+    rejectionReason,
+    setRejectionReason,
+    handleLogout,
+    deactivateUser,
+    openEditModal,
+    handleAddUser,
+    handleUpdateUser,
+    pendingAdminRequests,
+    handleApproveRequest,
+    handleOpenRejectModal,
+    handleCloseRejectModal,
+    handleConfirmReject,
+  } = useAdminTeamSettings({
+    initialUsers,
+    initialRequests: INITIAL_ADMIN_REQUESTS,
+    addUserSuccess: (name) => `${name} added to the team!`,
+  });
+
+  // --- PakiShip-only security/password modal state ---
   const [isSaving, setIsSaving] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
-  
-  // Modal States
-  const [showAddUserModal, setShowAddUserModal] = useState(false);
-  const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  
-  // Password Form State
-  const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" });
+  const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' });
   const [showPass, setShowPass] = useState(false);
-  const [passwordError, setPasswordError] = useState(""); 
-
-  // User Management States
-  const [currentUser, setCurrentUser] = useState<UserRecord | null>(null);
-  const [newUser, setNewUser] = useState<EditableUser>({ name: "", email: "", role: "View Only" });
-  const [adminRequests, setAdminRequests] = useState<AdminRequestRecord[]>(INITIAL_ADMIN_REQUESTS);
-  const [requestToReject, setRequestToReject] = useState<AdminRequestRecord | null>(null);
-  const [rejectionReason, setRejectionReason] = useState('');
-  const roleOptions = ["No Access", "View Only", "Limited Access", "Full Access", "Super Admin"];
-  const placeholderName = getDisplayNameForEmail(user?.email, "Juan Dela Cruz");
-
-  const [users, setUsers] = useState<UserRecord[]>([
-    { id: 1, name: placeholderName, email: user?.email || "juandelacruz@pakiadmin.ph", role: "Super Admin", status: "Active" },
-    { id: 2, name: "Martha Burgos", email: "marthaburgos@pakiadmin.ph", role: "Full Access", status: "Active" },
-    { id: 3, name: "Rhea Rivera", email: "rhearivera@pakiadmin.ph", role: "View Only", status: "Inactive" },
-    { id: 4, name: "Justin Perez", email: "justinperez@pakiadmin.ph", role: "Limited Access", status: "Active" },
-    { id: 5, name: "Patricia Gonzaga", email: "patriciagonzaga@pakiadmin.ph", role: "View Only", status: "Active" },
-    { id: 6, name: "Raphael Santos", email: "rapahaelsantos@pakiadmin.ph", role: "Limited Access", status: "Active" },
-  ]);
-
-  // --- ACTIONS ---
-  const triggerSuccess = (msg: string) => {
-    setSuccessMessage(msg);
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 3000);
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
+  const [passwordError, setPasswordError] = useState('');
 
   const handleOpenNotificationPreferences = () => {
     setIsNotificationMenuOpen(false);
@@ -144,97 +160,23 @@ export default function SettingsPage() {
     });
   };
 
-  const deactivateUser = (id: number) => {
-    setUsers(users.map(u => u.id === id ? { ...u, status: u.status === 'Active' ? 'Inactive' : 'Active' } : u));
-    triggerSuccess("Staff access status updated.");
-  };
-
-  const openEditModal = (user: UserRecord) => {
-    setCurrentUser({ ...user });
-    setShowEditUserModal(true);
-  };
-
-  const handleAddUser = () => {
-    const id = users.length + 1;
-    setUsers([...users, { ...newUser, id, status: "Active" }]);
-    triggerSuccess(`${newUser.name} added to the team!`);
-    setShowAddUserModal(false);
-    setNewUser({ name: "", email: "", role: "View Only" });
-  };
-
-  const handleUpdateUser = () => {
-    if (!currentUser) {
+  const handleChangePassword = () => {
+    setPasswordError('');
+    if (!passwords.current || !passwords.next || !passwords.confirm) {
+      setPasswordError('All fields are required for security.');
       return;
     }
-
-    setUsers(users.map(u => u.id === currentUser.id ? currentUser : u));
-    triggerSuccess(`Staff profile updated.`);
-    setShowEditUserModal(false);
-  };
-
-  const handleChangePassword = () => {
-    setPasswordError(""); 
-    if (!passwords.current || !passwords.next || !passwords.confirm) {
-        setPasswordError("All fields are required for security.");
-        return;
-    }
     if (passwords.next !== passwords.confirm) {
-      setPasswordError("Passwords do not match.");
+      setPasswordError('Passwords do not match.');
       return;
     }
     setIsSaving(true);
     setTimeout(() => {
       setIsSaving(false);
       setShowPasswordModal(false);
-      setPasswords({ current: "", next: "", confirm: "" });
-      triggerSuccess("Admin credentials secured.");
+      setPasswords({ current: '', next: '', confirm: '' });
+      triggerSuccess('Admin credentials secured.');
     }, 1500);
-  };
-
-  const pendingAdminRequests = adminRequests.filter((request) => request.status === 'pending');
-
-  const handleApproveRequest = (requestId: string) => {
-    setAdminRequests((prev) =>
-      prev.map((request) =>
-        request.id === requestId
-          ? {
-              ...request,
-              status: 'approved',
-            }
-          : request,
-      ),
-    );
-    triggerSuccess('Admin request approved.');
-  };
-
-  const handleOpenRejectModal = (request: AdminRequestRecord) => {
-    setRequestToReject(request);
-    setRejectionReason('');
-  };
-
-  const handleCloseRejectModal = () => {
-    setRequestToReject(null);
-    setRejectionReason('');
-  };
-
-  const handleConfirmReject = () => {
-    if (!requestToReject || !rejectionReason.trim()) {
-      return;
-    }
-
-    setAdminRequests((prev) =>
-      prev.map((request) =>
-        request.id === requestToReject.id
-          ? {
-              ...request,
-              status: 'rejected',
-              rejectedReason: rejectionReason.trim(),
-            }
-          : request,
-      ),
-    );
-    triggerSuccess('Admin request rejected with reason.');
-    handleCloseRejectModal();
   };
 
   return (
@@ -286,98 +228,36 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {requestToReject && (
-        <div className="fixed inset-0 z-[115] flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-[#041614]/55 backdrop-blur-sm"
-            onClick={handleCloseRejectModal}
-          ></div>
-          <Card className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl border-none animate-in zoom-in-95 duration-200">
-            <CardContent className="p-8">
-              <div className="flex items-start justify-between mb-6 gap-4">
-                <div>
-                  <h3 className="text-xl font-bold text-[#041614]">Reject Admin Request</h3>
-                  <p className="text-sm text-[#1A5D56]/60 font-medium mt-1">
-                    Provide a rejection reason before declining {requestToReject.name}&apos;s signup request.
-                  </p>
-                </div>
-                <button
-                  onClick={handleCloseRejectModal}
-                  className="p-2 hover:bg-[#F0F9F8] rounded-full transition-colors"
-                >
-                  <X className="w-5 h-5 text-gray-400" />
-                </button>
-              </div>
+      <RejectRequestModal
+        request={requestToReject}
+        reason={rejectionReason}
+        setReason={setRejectionReason}
+        onClose={handleCloseRejectModal}
+        onConfirm={handleConfirmReject}
+        theme={theme}
+        copy={{
+          description: (name) => `Provide a rejection reason before declining ${name}'s signup request.`,
+          placeholder: 'Explain why this request cannot be approved right now...',
+          helper: 'This reason will be shared with the applicant by the Super-Admin.',
+        }}
+      />
 
-              <div className="space-y-3">
-                <label className="text-[10px] font-bold text-[#1A5D56]/50 uppercase tracking-widest ml-1">
-                  Rejection Reason
-                </label>
-                <textarea
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="Explain why this request cannot be approved right now..."
-                  className="w-full min-h-32 rounded-2xl border border-[#39B5A8]/15 bg-[#F0F9F8]/40 px-4 py-3 outline-none focus:bg-white focus:border-[#39B5A8] transition-all text-sm font-medium resize-none"
-                />
-                <p className="text-xs text-[#1A5D56]/55 font-medium">
-                  This reason will be shared with the applicant by the Super-Admin.
-                </p>
-              </div>
-
-              <div className="mt-6 flex items-center justify-end gap-3">
-                <Button
-                  variant="outline"
-                  onClick={handleCloseRejectModal}
-                  className="rounded-xl border-[#39B5A8]/15 text-[#1A5D56]"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleConfirmReject}
-                  disabled={!rejectionReason.trim()}
-                  className="rounded-xl bg-red-500 hover:bg-red-600 text-white disabled:opacity-50"
-                >
-                  Confirm Rejection
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* --- ADD/EDIT MODALS --- */}
-      {(showAddUserModal || showEditUserModal) && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-[#041614]/40 backdrop-blur-sm" onClick={() => { setShowAddUserModal(false); setShowEditUserModal(false); }}></div>
-          <Card className="relative w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl border-none animate-in zoom-in-95 duration-200">
-            <CardContent className="p-8">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-[#041614]">{showAddUserModal ? "Add Team Member" : "Edit Staff Profile"}</h3>
-                <button onClick={() => { setShowAddUserModal(false); setShowEditUserModal(false); }} className="p-2 hover:bg-[#F0F9F8] rounded-full"><X size={20} className="text-gray-400" /></button>
-              </div>
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-[#1A5D56]/40 uppercase ml-1">Full Name</label>
-                  <input type="text" className="w-full px-4 py-3 rounded-xl border border-[#39B5A8]/10 bg-[#F0F9F8]/30 outline-none focus:bg-white transition-all font-bold" value={showAddUserModal ? newUser.name : currentUser?.name} onChange={(e) => showAddUserModal ? setNewUser({...newUser, name: e.target.value}) : setCurrentUser(currentUser ? {...currentUser, name: e.target.value} : null)} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-[#1A5D56]/40 uppercase ml-1">Work Email</label>
-                  <input type="email" className="w-full px-4 py-3 rounded-xl border border-[#39B5A8]/10 bg-[#F0F9F8]/30 outline-none focus:bg-white transition-all font-bold" value={showAddUserModal ? newUser.email : currentUser?.email} onChange={(e) => showAddUserModal ? setNewUser({...newUser, email: e.target.value}) : setCurrentUser(currentUser ? {...currentUser, email: e.target.value} : null)} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-[#1A5D56]/40 uppercase ml-1">System Role</label>
-                  <select className="w-full px-4 py-3 rounded-xl border border-[#39B5A8]/10 bg-[#F0F9F8]/30 outline-none focus:bg-white transition-all font-bold appearance-none" value={showAddUserModal ? newUser.role : currentUser?.role} onChange={(e) => showAddUserModal ? setNewUser({...newUser, role: e.target.value}) : setCurrentUser(currentUser ? {...currentUser, role: e.target.value} : null)}>
-                    {roleOptions.map(role => <option key={role} value={role}>{role}</option>)}
-                  </select>
-                </div>
-                <Button onClick={showAddUserModal ? handleAddUser : handleUpdateUser} className="w-full bg-[#39B5A8] hover:bg-[#2F9D91] text-white rounded-xl py-6 font-bold mt-4 uppercase text-[10px] tracking-widest shadow-lg">
-                  {showAddUserModal ? "Invite" : "Update Permissions"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      <AddEditUserModal
+        show={showAddUserModal || showEditUserModal}
+        isAddMode={showAddUserModal}
+        newUser={newUser}
+        setNewUser={setNewUser}
+        currentUser={currentUser}
+        setCurrentUser={setCurrentUser}
+        roleOptions={roleOptions}
+        onClose={() => {
+          setShowAddUserModal(false);
+          setShowEditUserModal(false);
+        }}
+        onSubmit={showAddUserModal ? handleAddUser : handleUpdateUser}
+        theme={theme}
+        copy={{ addTitle: 'Add Team Member', addButton: 'Invite' }}
+      />
 
       {/* --- MAIN CONTENT WRAPPER --- */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
@@ -523,65 +403,13 @@ export default function SettingsPage() {
 
           {isSuperAdmin && activeTab === 'team' ? (
             <>
-              <Card className="bg-white rounded-[2.5rem] border-[#39B5A8]/10 shadow-sm overflow-hidden flex flex-col h-[500px]">
-                <CardHeader className="p-8 border-b border-[#39B5A8]/5 bg-white flex-shrink-0">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 bg-[#F0F9F8] rounded-2xl"><Users className="w-5 h-5 text-[#39B5A8]" /></div>
-                      <div>
-                        <CardTitle className="text-xl font-bold text-[#041614]">Team Management</CardTitle>
-                        <CardDescription className="text-xs font-medium text-[#1A5D56]/60">Add, edit or deactivate system users</CardDescription>
-                      </div>
-                    </div>
-                    <Button onClick={() => setShowAddUserModal(true)} className="bg-[#39B5A8] hover:bg-[#2F9D91] text-white rounded-xl font-bold h-12 px-5 transition-all shadow-lg shadow-[#39B5A8]/20">
-                      <UserPlus className="w-4 h-4 mr-2" /> Add User
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0 overflow-y-auto flex-1 custom-scrollbar">
-                  <table className="w-full text-left border-collapse">
-                    <thead className="bg-[#F0F9F8] border-b border-[#39B5A8]/10 text-[10px] uppercase font-bold text-[#39B5A8] sticky top-0 z-10">
-                      <tr>
-                        <th className="px-8 py-4">User</th>
-                        <th className="px-8 py-4">Role</th>
-                        <th className="px-8 py-4">Status</th>
-                        <th className="px-8 py-4 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#39B5A8]/5">
-                      {users.map((u) => (
-                        <tr key={u.id} className="hover:bg-[#F0F9F8]/50 transition-colors group">
-                          <td className="px-8 py-5">
-                            <p className="font-bold text-sm text-[#041614]">{u.name}</p>
-                            <p className="text-xs text-gray-400 font-medium">{u.email}</p>
-                          </td>
-                          <td className="px-8 py-5">
-                            <span className={`text-[10px] font-bold px-3 py-1 bg-white border rounded-lg uppercase tracking-wider ${
-                              u.role === 'Super Admin' ? 'border-[#39B5A8] text-[#39B5A8]' : 'border-[#39B5A8]/20 text-[#041614]'
-                            }`}>
-                              {u.role}
-                            </span>
-                          </td>
-                          <td className="px-8 py-5">
-                            <div className={`flex items-center gap-1.5 text-xs font-bold ${u.status === 'Active' ? 'text-emerald-500' : 'text-gray-400'}`}>
-                                <div className={`w-1.5 h-1.5 rounded-full ${u.status === 'Active' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                                {u.status}
-                            </div>
-                          </td>
-                          <td className="px-8 py-5 text-right">
-                            <div className="flex justify-end gap-2">
-                              <button onClick={() => openEditModal(u)} className="p-2 hover:bg-white rounded-lg text-gray-400 hover:text-[#39B5A8] transition-all"><Edit3 size={16} /></button>
-                              <button onClick={() => deactivateUser(u.id)} className={`p-2 hover:bg-white rounded-lg transition-all ${u.status === 'Active' ? 'text-red-400 hover:text-red-500' : 'text-emerald-400'}`}>
-                                  {u.status === 'Active' ? <UserMinus size={16} /> : <UserPlus size={16} />}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </CardContent>
-              </Card>
+              <TeamManagementCard
+                users={users}
+                onAddUser={() => setShowAddUserModal(true)}
+                onEditUser={openEditModal}
+                onToggleStatus={deactivateUser}
+                theme={theme}
+              />
 
               <NotificationPreferencesPanel
                 sectionId="pakiship-notification-preferences"
@@ -623,85 +451,13 @@ export default function SettingsPage() {
               />
             </>
           ) : isSuperAdmin && activeTab === 'requests' ? (
-            <Card className="bg-white rounded-[2.5rem] border-[#39B5A8]/10 shadow-sm overflow-hidden">
-              <CardHeader className="p-8 border-b border-[#39B5A8]/5 bg-white">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-[#F0F9F8] rounded-2xl">
-                    <UserCheck className="w-5 h-5 text-[#39B5A8]" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-xl font-bold text-[#041614]">Admin Requests</CardTitle>
-                    <CardDescription className="text-xs font-medium text-[#1A5D56]/60">
-                      Review pending admin signup requests and decide whether to approve or reject them.
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                {pendingAdminRequests.length === 0 ? (
-                  <div className="px-8 py-16 text-center">
-                    <p className="text-lg font-bold text-[#041614]">No pending admin requests</p>
-                    <p className="mt-2 text-sm text-[#1A5D56]/60 font-medium">
-                      New signup requests will appear here for Super-Admin review.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                      <thead className="bg-[#F0F9F8] border-b border-[#39B5A8]/10 text-[10px] uppercase font-bold text-[#39B5A8]">
-                        <tr>
-                          <th className="px-8 py-4">Applicant</th>
-                          <th className="px-8 py-4">Requested Role</th>
-                          <th className="px-8 py-4">Request Date</th>
-                          <th className="px-8 py-4">Status</th>
-                          <th className="px-8 py-4 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#39B5A8]/5">
-                        {pendingAdminRequests.map((request) => (
-                          <tr key={request.id} className="hover:bg-[#F0F9F8]/40 transition-colors">
-                            <td className="px-8 py-5">
-                              <p className="font-bold text-sm text-[#041614]">{request.name}</p>
-                              <p className="text-xs text-gray-400 font-medium">{request.email}</p>
-                            </td>
-                            <td className="px-8 py-5">
-                              <span className="inline-flex rounded-lg border border-[#39B5A8]/15 bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#041614]">
-                                {request.requestedRole}
-                              </span>
-                            </td>
-                            <td className="px-8 py-5 text-sm font-semibold text-[#1A5D56]">
-                              {request.requestDate}
-                            </td>
-                            <td className="px-8 py-5">
-                              <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-700">
-                                Pending
-                              </span>
-                            </td>
-                            <td className="px-8 py-5">
-                              <div className="flex justify-end gap-3">
-                                <Button
-                                  onClick={() => handleApproveRequest(request.id)}
-                                  className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl h-10 px-4"
-                                >
-                                  Approve
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  onClick={() => handleOpenRejectModal(request)}
-                                  className="rounded-xl border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600"
-                                >
-                                  Reject
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <AdminRequestsCard
+              requests={pendingAdminRequests}
+              onApprove={handleApproveRequest}
+              onReject={handleOpenRejectModal}
+              theme={theme}
+              copy={{ emptyDescription: 'New signup requests will appear here for Super-Admin review.' }}
+            />
           ) : (
             <TwoFactorAuthPanel platform="pakiship" />
           )}

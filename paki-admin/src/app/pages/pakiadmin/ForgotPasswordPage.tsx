@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { pakiAdminLogo } from '../../lib/assets';
+import { AuthFeatureCard as SecurityFeatureCard } from '../../components/pakiadmin/AdminFeatureCards';
 
 // Mock database of registered admin emails
 const REGISTERED_EMAILS = [
@@ -281,16 +282,3 @@ export default function ForgotPasswordPage() {
   );
 }
 
-function SecurityFeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
-  return (
-    <div className="flex items-center gap-4 p-4 bg-white/80 border border-[#dec0f1] rounded-2xl shadow-sm hover:shadow-md transition-all group">
-      <div className="w-11 h-11 bg-[#dec0f1]/40 rounded-xl shrink-0 flex items-center justify-center text-[#2c0735] transition-colors group-hover:bg-[#2c0735] group-hover:text-white">
-        {icon}
-      </div>
-      <div className="flex flex-col text-left">
-        <h4 className="font-black text-[#2c0735] text-base leading-tight">{title}</h4>
-        <p className="text-[#2c0735]/50 text-xs font-bold leading-tight mt-0.5">{desc}</p>
-      </div>
-    </div>
-  );
-}

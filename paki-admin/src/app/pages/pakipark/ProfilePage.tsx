@@ -1,4 +1,4 @@
-import { useState, useRef, cloneElement, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from '../../lib/router';
 import {
   User,
@@ -13,26 +13,33 @@ import {
   EyeOff,
   ShieldCheck,
   RefreshCw,
-  X,
   Search,
   ChevronDown,
   LogOut,
-  AlertCircle,
-  CheckCircle2,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { toast } from 'sonner';
 import { useAuth } from '../../contexts/AuthContext';
 import PakiParkSidebar from '../../components/pakipark/PakiParkSidebar';
+import { usePasswordValidation, FormInput, PasswordResetModal, type ProfileTheme } from '../../components/profile/profileForm';
 
-function readStoredValue(key: string, fallback: string) {
-  if (typeof window === 'undefined') {
-    return fallback;
-  }
-
-  return localStorage.getItem(key) || fallback;
-}
+const theme: ProfileTheme = {
+  fieldLabel: 'text-[#8492a6]',
+  inputEnabled: 'bg-white border-[#e2e8f0] focus:border-[#1e3d5a] text-[#1e3d5a]',
+  inputDisabled: 'bg-[#f4f7fa] border-transparent text-[#1e3d5a]/60',
+  inputHeight: 'h-14',
+  iconFocus: 'group-focus-within:text-[#ee6b20]',
+  pwLabel: 'text-xs font-black text-[#1e3d5a]/60 ml-1 uppercase tracking-wider',
+  pwInput: 'rounded-2xl pr-12 h-14 bg-[#f4f7fa] border-2 border-transparent focus:border-[#ee6b20]/20 focus:bg-white font-bold transition-all',
+  pwToggleHover: 'hover:text-[#ee6b20]',
+  modalBorder: 'border-[#e2e8f0]',
+  modalTitle: 'text-[#1e3d5a]',
+  modalSubtitle: 'text-[#1e3d5a]/60',
+  reqBox: 'bg-[#f4f7fa] border-[#1e3d5a]/10',
+  reqLabel: 'text-[#ee6b20]',
+  confirmEnabled: 'bg-[#1e3d5a] hover:bg-[#2a5373] text-white',
+};
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -86,23 +93,7 @@ export default function ProfilePage() {
     }
   }, [user]);
 
-  const [passwordData, setPasswordData] = useState({ current: '', new: '' });
-  const [passwordErrors, setPasswordErrors] = useState({
-    length: false,
-    number: false,
-    symbol: false,
-  });
-
-  // --- PASSWORD VALIDATION LOGIC ---
-  useEffect(() => {
-    setPasswordErrors({
-      length: passwordData.new.length >= 8,
-      number: /\d/.test(passwordData.new),
-      symbol: /[!@#$%^&*(),.?":{}|<>]/.test(passwordData.new),
-    });
-  }, [passwordData.new]);
-
-  const isPasswordValid = passwordErrors.length && passwordErrors.number && passwordErrors.symbol;
+  const { passwordData, setPasswordData, passwordErrors, isPasswordValid } = usePasswordValidation();
 
   const adminDetails = [
     { label: 'System Role', value: 'Facility Admin', icon: <ShieldCheck className="w-4 h-4" /> },
@@ -172,46 +163,19 @@ export default function ProfilePage() {
   return (
     <div className="flex h-screen bg-[#f4f7fa] font-sans text-[#1e3d5a] overflow-hidden">
       {/* Enhanced Password Modal */}
-      {showPasswordModal && (
-        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full p-8 border border-[#e2e8f0] relative">
-            <button onClick={() => setShowPasswordModal(false)} className="absolute right-8 top-8 text-gray-400 hover:text-red-500 transition-colors">
-              <X className="w-6 h-6" />
-            </button>
-            
-            <div className="mb-6">
-              <h3 className="text-2xl font-bold text-[#1e3d5a]">Security Update</h3>
-              <p className="text-sm text-[#1e3d5a]/60">Change your facility management password.</p>
-            </div>
-
-            <div className="space-y-5">
-              <PasswordField label="Current Password" value={passwordData.current} show={showPass.current} toggle={() => setShowPass({ ...showPass, current: !showPass.current })} onChange={(v: string) => setPasswordData({ ...passwordData, current: v })} />
-              
-              <div className="space-y-3">
-                <PasswordField label="New Password" value={passwordData.new} show={showPass.new} toggle={() => setShowPass({ ...showPass, new: !showPass.new })} onChange={(v: string) => setPasswordData({ ...passwordData, new: v })} />
-                
-                <div className="bg-[#f4f7fa] rounded-2xl p-4 border border-[#1e3d5a]/10 space-y-2">
-                  <p className="text-[10px] font-bold text-[#ee6b20] uppercase tracking-widest mb-2">Requirements</p>
-                  <ValidationCheck label="At least 8 characters" isValid={passwordErrors.length} />
-                  <ValidationCheck label="At least 1 number" isValid={passwordErrors.number} />
-                  <ValidationCheck label="At least 1 special symbol" isValid={passwordErrors.symbol} />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-8">
-              <Button onClick={() => setShowPasswordModal(false)} variant="ghost" className="flex-1 rounded-2xl h-12 font-bold text-gray-500">Cancel</Button>
-              <Button 
-                disabled={!isPasswordValid || !passwordData.current}
-                className={`flex-1 rounded-2xl h-12 font-bold shadow-lg transition-all ${isPasswordValid ? 'bg-[#1e3d5a] hover:bg-[#2a5373] text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`} 
-                onClick={handleUpdatePassword}
-              >
-                Update Password
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PasswordResetModal
+        show={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+        subtitle="Change your facility management password."
+        passwordData={passwordData}
+        setPasswordData={setPasswordData}
+        showPass={showPass}
+        setShowPass={setShowPass}
+        passwordErrors={passwordErrors}
+        isPasswordValid={isPasswordValid}
+        onConfirm={handleUpdatePassword}
+        theme={theme}
+      />
 
       <PakiParkSidebar activeTab="profile" />
 
@@ -314,18 +278,18 @@ export default function ProfilePage() {
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-6">
-                    <FormInput icon={<User />} label="Full Name" value={formData.name} onChange={(v: string) => setFormData({ ...formData, name: v })} disabled={!isEditing} />
-                    <FormInput icon={<ShieldCheck />} label="Admin ID" value={formData.adminId} disabled={true} />
-                    
+                    <FormInput icon={<User />} label="Full Name" value={formData.name} onChange={(v: string) => setFormData({ ...formData, name: v })} disabled={!isEditing} theme={theme} />
+                    <FormInput icon={<ShieldCheck />} label="Admin ID" value={formData.adminId} disabled={true} theme={theme} />
+
                     <div className="md:col-span-2">
-                      <FormInput icon={<Mail />} label="Email Address" value={formData.email} onChange={(v: string) => setFormData({ ...formData, email: v })} disabled={!isEditing} />
+                      <FormInput icon={<Mail />} label="Email Address" value={formData.email} onChange={(v: string) => setFormData({ ...formData, email: v })} disabled={!isEditing} theme={theme} />
                     </div>
-                    
-                    <FormInput icon={<Phone />} label="Phone Number" value={formData.phone} onChange={(v: string) => setFormData({ ...formData, phone: v })} disabled={!isEditing} />
-                    <FormInput icon={<Calendar />} label="Birth Date" type="date" value={formData.dob} onChange={(v: string) => setFormData({ ...formData, dob: v })} disabled={!isEditing} />
-                    
+
+                    <FormInput icon={<Phone />} label="Phone Number" value={formData.phone} onChange={(v: string) => setFormData({ ...formData, phone: v })} disabled={!isEditing} theme={theme} />
+                    <FormInput icon={<Calendar />} label="Birth Date" type="date" value={formData.dob} onChange={(v: string) => setFormData({ ...formData, dob: v })} disabled={!isEditing} theme={theme} />
+
                     <div className="md:col-span-2">
-                      <FormInput icon={<MapPin />} label="Residential Address" value={formData.address} onChange={(v: string) => setFormData({ ...formData, address: v })} disabled={!isEditing} />
+                      <FormInput icon={<MapPin />} label="Residential Address" value={formData.address} onChange={(v: string) => setFormData({ ...formData, address: v })} disabled={!isEditing} theme={theme} />
                     </div>
 
                     {/* Integrated Password Field */}
@@ -370,59 +334,4 @@ export default function ProfilePage() {
   );
 }
 
-// --- SUB-COMPONENTS ---
-
-function FormInput({ icon, label, value, onChange, type = 'text', disabled = false }: any) {
-  return (
-    <div className="space-y-2">
-      <label className="text-[10px] font-bold text-[#8492a6] uppercase tracking-[0.2em] ml-1">{label}</label>
-      <div className="relative group">
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 z-10 transition-colors group-focus-within:text-[#ee6b20]">
-          {icon && cloneElement(icon, { className: 'w-4 h-4' })}
-        </div>
-        <Input
-          type={type}
-          value={value}
-          onChange={(e) => onChange?.(e.target.value)}
-          disabled={disabled}
-          className={`w-full ${disabled ? 'bg-[#f4f7fa] border-transparent text-[#1e3d5a]/60' : 'bg-white border-[#e2e8f0] focus:border-[#1e3d5a] text-[#1e3d5a]'} border-2 rounded-2xl pl-12 pr-4 py-6 text-sm font-bold transition-all h-14`}
-        />
-      </div>
-    </div>
-  );
-}
-
-function PasswordField({ label, value, show, toggle, onChange }: any) {
-  return (
-    <div className="space-y-2">
-      <label className="text-xs font-black text-[#1e3d5a]/60 ml-1 uppercase tracking-wider">{label}</label>
-      <div className="relative">
-        <Input 
-          type={show ? 'text' : 'password'} 
-          value={value} 
-          onChange={(e) => onChange(e.target.value)} 
-          className="rounded-2xl pr-12 h-14 bg-[#f4f7fa] border-2 border-transparent focus:border-[#ee6b20]/20 focus:bg-white font-bold transition-all" 
-        />
-        <button type="button" onClick={toggle} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#ee6b20]">
-          {show ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ValidationCheck({ label, isValid }: { label: string; isValid: boolean }) {
-  return (
-    <div className="flex items-center gap-2">
-      {isValid ? (
-        <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-      ) : (
-        <AlertCircle className="w-3 h-3 text-red-400" />
-      )}
-      <span className={`text-[11px] font-bold ${isValid ? 'text-emerald-600' : 'text-gray-400'}`}>
-        {label}
-      </span>
-    </div>
-  );
-}
 

@@ -308,21 +308,7 @@ export default function SuperAdminDashboardPage() {
     if (activeDashboardTab === 'System Health') {
       return (
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-[2rem] border border-[#300066]/15 bg-gradient-to-br from-white to-[#f1e3ff] p-7 shadow-sm">
-            <h2 className="text-xl font-black uppercase tracking-[0.12em] text-[#300066]/75">Live Service Health</h2>
-            <div className="mt-6 divide-y divide-[#300066]/10">
-              {systemHealth.map((service) => (
-                <div key={service.service} className="grid grid-cols-[1fr_auto_auto] items-center gap-4 py-4">
-                  <div className="flex items-center gap-3">
-                    <span className={`h-3 w-3 rounded-full ${service.tone}`}></span>
-                    <span className="font-black text-[#2c0735]">{service.service}</span>
-                  </div>
-                  <span className="text-sm font-black text-[#300066]">{service.latency}</span>
-                  <span className="text-sm font-bold text-[#300066]/65">{service.status}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <SystemHealthCard title="Live Service Health" services={systemHealth} />
 
           <div className="rounded-[2rem] border border-[#300066]/15 bg-gradient-to-br from-white to-[#f1e3ff] p-7 shadow-sm">
             <h2 className="text-xl font-black uppercase tracking-[0.12em] text-[#300066]/75">Incident Watch</h2>
@@ -485,21 +471,7 @@ export default function SuperAdminDashboardPage() {
             </div>
           </div>
 
-          <div className="rounded-[2rem] border border-[#300066]/15 bg-gradient-to-br from-white to-[#f1e3ff] p-7 shadow-sm">
-            <h2 className="text-xl font-black uppercase tracking-[0.12em] text-[#300066]/75">System Health</h2>
-            <div className="mt-6 divide-y divide-[#300066]/10">
-              {systemHealth.map((service) => (
-                <div key={service.service} className="grid grid-cols-[1fr_auto_auto] items-center gap-4 py-4">
-                  <div className="flex items-center gap-3">
-                    <span className={`h-3 w-3 rounded-full ${service.tone}`}></span>
-                    <span className="font-black text-[#2c0735]">{service.service}</span>
-                  </div>
-                  <span className="text-sm font-black text-[#300066]">{service.latency}</span>
-                  <span className="text-sm font-bold text-[#300066]/65">{service.status}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <SystemHealthCard title="System Health" services={systemHealth} />
         </section>
       </>
     );
@@ -1090,6 +1062,32 @@ export default function SuperAdminDashboardPage() {
 }
 
 // Helper Components
+
+function SystemHealthCard({
+  title,
+  services,
+}: {
+  title: string;
+  services: Array<{ service: string; latency: string; status: string; tone: string }>;
+}) {
+  return (
+    <div className="rounded-[2rem] border border-[#300066]/15 bg-gradient-to-br from-white to-[#f1e3ff] p-7 shadow-sm">
+      <h2 className="text-xl font-black uppercase tracking-[0.12em] text-[#300066]/75">{title}</h2>
+      <div className="mt-6 divide-y divide-[#300066]/10">
+        {services.map((service) => (
+          <div key={service.service} className="grid grid-cols-[1fr_auto_auto] items-center gap-4 py-4">
+            <div className="flex items-center gap-3">
+              <span className={`h-3 w-3 rounded-full ${service.tone}`}></span>
+              <span className="font-black text-[#2c0735]">{service.service}</span>
+            </div>
+            <span className="text-sm font-black text-[#300066]">{service.latency}</span>
+            <span className="text-sm font-bold text-[#300066]/65">{service.status}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 interface NavButtonProps {
   active: boolean;

@@ -2,10 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from '../../lib/router';
 import {
   Search,
-  ChevronDown,
-  User,
-  Settings,
-  LogOut,
   Plus,
   MapPin,
   Car,
@@ -22,6 +18,7 @@ import { Card, CardTitle, CardHeader, CardContent, CardDescription } from '../..
 import { Badge } from "../../components/ui/badge";
 import { useAuth } from '../../contexts/AuthContext';
 import PakiParkSidebar from '../../components/pakipark/PakiParkSidebar';
+import { PakiParkHeaderUserMenu } from '../../components/pakipark/pakiparkUi';
 
 // MODAL IMPORT
 import AddNewHub from './components/AddNewHub';
@@ -29,7 +26,6 @@ import AddNewHub from './components/AddNewHub';
 export default function BookingsPage() {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [hubs, setHubs] = useState<any[]>([]);
@@ -118,41 +114,7 @@ export default function BookingsPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-6">
-            <div className="h-8 w-[1px] bg-[#1e3d5a]/10"></div>
-            <div className="relative">
-              <button
-                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="flex items-center gap-3 hover:bg-[#f4f7fa] px-3 py-2 rounded-xl transition-all"
-              >
-                <div className="w-10 h-10 bg-gradient-to-br from-[#1e3d5a] to-[#2a5373] rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-blue-900/20">
-                  {displayName.charAt(0).toUpperCase()}
-                </div>
-                <div className="text-left hidden md:block min-w-max">
-                  <p className="text-sm font-bold text-[#1e3d5a] leading-tight whitespace-nowrap">{displayName}</p>
-                </div>
-                <ChevronDown className={`w-4 h-4 text-[#1e3d5a] transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {isUserMenuOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-[#1e3d5a]/10 overflow-hidden z-50">
-                  <button onClick={() => { setIsUserMenuOpen(false); navigate('/pakipark/profile'); }} className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#f4f7fa] text-left">
-                    <User className="w-4 h-4 text-[#ee6b20]" />
-                    <span className="font-semibold text-[#1e3d5a]">Profile</span>
-                  </button>
-                  <button onClick={() => { setIsUserMenuOpen(false); navigate('/pakipark/settings'); }} className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#f4f7fa] text-left">
-                    <Settings className="w-4 h-4 text-[#ee6b20]" />
-                    <span className="font-semibold text-[#1e3d5a]">Settings</span>
-                  </button>
-                  <div className="border-t border-[#1e3d5a]/10"></div>
-                  <button onClick={handleLogout} className="w-full flex items-center gap-3 px-5 py-3 hover:bg-red-50 text-left">
-                    <LogOut className="w-4 h-4 text-red-500" />
-                    <span className="font-semibold text-red-500">Logout</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+          <PakiParkHeaderUserMenu displayName={displayName} onLogout={handleLogout} />
         </header>
 
         {/* --- MAIN CONTENT BODY --- */}
